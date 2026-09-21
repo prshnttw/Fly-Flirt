@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fly//Flirt — What happens when a real fly brain reads your conversation?</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+  <div id="landing-canvas-bg" class="landing-canvas-bg"></div>
+
+  <main class="landing-container">
+    <div class="landing-card glass-panel">
+      <div class="brand-badge">
+        <span class="pulse-dot"></span>
+        <span>MaleCNS v1.0 Connectome</span>
+      </div>
+
+      <h1 class="landing-title">🪰 Fly//Flirt</h1>
+      <p class="landing-tagline">
+        What happens when a real fly brain reads your conversation?
+        <span class="info-wrap">
+          <button type="button" class="info-btn" data-info-toggle aria-expanded="false" aria-label="What is this?">i</button>
+          <span class="info-popover" data-info-popover hidden>
+            Fly Chat maps conversational signals onto a biologically grounded Drosophila courtship circuit and simulates how activity propagates through its real connectivity.
+          </span>
+        </span>
+      </p>
+
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <div class="flash" style="background: rgba(255, 0, 127, 0.15); border: 1px solid var(--neon-pink); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.88rem; color: #fff;">
+            {% for message in messages %}
+              <p>{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <div class="role-grid">
+        {% if taken.male %}
+          <div class="role-card role-male disabled">
+            <span class="role-icon">🪰</span>
+            <span class="role-name">Male Specimen</span>
+            <span class="role-status">Occupied</span>
+          </div>
+        {% else %}
+          <a class="role-card role-male" href="{{ url_for('choose_role', role='male') }}">
+            <span class="role-icon">🪰</span>
+            <span class="role-name">Male Specimen</span>
+            <span class="role-status">Ready to Enter →</span>
+          </a>
+        {% endif %}
+
+        {% if taken.female %}
+          <div class="role-card role-female disabled">
+            <span class="role-icon">🌸</span>
+            <span class="role-name">Female Specimen</span>
+            <span class="role-status">Occupied</span>
+          </div>
+        {% else %}
+          <a class="role-card role-female" href="{{ url_for('choose_role', role='female') }}">
+            <span class="role-icon">🌸</span>
+            <span class="role-name">Female Specimen</span>
+            <span class="role-status">Ready to Enter →</span>
+          </a>
+        {% endif %}
+      </div>
+
+      <div class="connectome-pills">
+        <div class="pill-item">⚡ 497 Real Neurons</div>
+        <div class="pill-item">🧬 2,296 Synaptic Edges</div>
+        <div class="pill-item">🧠 Realtime Leaky Integrator</div>
+      </div>
+
+      <div class="landing-secondary-links">
+        <a href="{{ url_for('fly_brain_page') }}" class="nav-link-btn">
+          <span>🧠</span>
+          <span>Watch the Live Fly Brain</span>
+        </a>
+        <a href="{{ url_for('circuit_card_page') }}" class="nav-link-btn">
+          <span>📊</span>
+          <span>View a Sample Circuit Card</span>
+        </a>
+      </div>
+
+      <a href="{{ url_for('reset_demo') }}" class="reset-demo-link" onclick="return confirm('Reset the whole demo? This clears both seats and the current conversation’s progress.');">
+        🔄 Reset demo for a new pair
+      </a>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="{{ url_for('static', filename='fly_brain_core.js') }}"></script>
+  <script src="{{ url_for('static', filename='info-toggle.js') }}"></script>
+  <script>
+    // Initialize ambient 3D connectome background
+    window.addEventListener('DOMContentLoaded', () => {
+      const bg = new FlyBrainVisualizer('landing-canvas-bg', {
+        autoRotate: true,
+        autoRotateSpeed: 0.0018,
+        enableControls: false,
+        interactive: false,
+        cameraDistance: 2.1,
+        fov: 60,
+        showEdges: true
+      });
+      // Ambient synaptic firings every few seconds
+      setInterval(() => {
+        if (bg && bg.triggerSynapticFiring) {
+          bg.triggerSynapticFiring(0.8 + Math.random() * 0.6);
+        }
+      }, 3500);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+.venv
+.env
+.git
+Claude/
+*.md
+chat.db
+circuit_state.json
+stats_state.json
+best_quote.json
+neurons.csv
+connections.csv
+fetch_circuit.py
+__pycache__
+*.pyc

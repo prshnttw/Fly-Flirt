@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>🪰 Fly//Flirt — Live Drosophila Courtship Circuit</title>
+  <meta name="description" content="Real-time courtship chemistry simulation powered by a biological Drosophila connectome (MaleCNS v1.0). Chat, watch neurons fire, and see courtship accumulate live.">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body data-role="{{ role }}">
+  <div class="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar glass-panel">
+      <div class="nav-brand">
+        <span style="font-size: 1.4rem;">🪰</span>
+        <span class="brand-title">Fly//Flirt</span>
+        <span class="info-wrap">
+          <button type="button" class="info-btn" data-info-toggle aria-expanded="false" aria-label="What is this?">i</button>
+          <span class="info-popover" data-info-popover hidden>
+            Fly Chat maps conversational signals onto a biologically grounded Drosophila courtship circuit and simulates how activity propagates through its real connectivity.
+          </span>
+        </span>
+        <span class="nav-session-role role-{{ role }}">
+          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
+          {{ role }} specimen
+        </span>
+      </div>
+      <div class="nav-actions">
+        <a href="{{ url_for('landing') }}" class="nav-link-btn">
+          <span>🏠</span>
+          <span>Home</span>
+        </a>
+        <a href="{{ url_for('fly_brain_page') }}" target="_blank" rel="noopener" class="nav-link-btn">
+          <span>🧠</span>
+          <span>Full 3D Spectator</span>
+        </a>
+        <a href="{{ url_for('circuit_card_page') }}" target="_blank" rel="noopener" class="nav-link-btn">
+          <span>📊</span>
+          <span>Circuit Card</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- ===== MOBILE-ONLY: Compact inline Brain + Verdict HUD ===== -->
+    <!-- This ensures verdict + fly brain remain visible on mobile during chat -->
+    <div class="mobile-inline-hud" id="mobile-inline-hud">
+      <div class="mobile-hud-row">
+        <!-- Mini 3D brain viewport -->
+        <div class="mobile-brain-mini" id="mobile-brain-viewport">
+          <span class="hud-tag">497 Neurons</span>
+        </div>
+        <!-- Verdict / diary strip -->
+        <div class="mobile-verdict-strip glass-panel" style="padding: 0.5rem 0.65rem;">
+          <div class="fly-state-badge" id="mobile-fly-state" data-state="idle">IDLE</div>
+          <p class="diary-quote" id="mobile-fly-diary">"Waiting for signals..."</p>
+          <div class="circuit-judge-box" id="mobile-fly-judge">
+            <div class="judge-region" id="mobile-judge-region">Whole Circuit</div>
+            <div class="judge-plain" id="mobile-judge-plain">Nothing much is happening yet.</div>
+          </div>
+        </div>
+      </div>
+      <!-- Compact meter bar -->
+      <div class="mobile-meter-strip">
+        <span class="meter-title">pC1 Arousal</span>
+        <div class="meter-track-modern">
+          <div class="meter-fill-modern" id="mobile-meter-fill"></div>
+        </div>
+        <span class="meter-percent" id="mobile-meter-percent">0%</span>
+      </div>
+    </div>
+
+    <!-- Main Cockpit Split Grid -->
+    <div class="cockpit-grid">
+      <!-- Left Column: Chat Stream -->
+      <section class="chat-column glass-panel" id="chat-tab-panel">
+        <div class="chat-header">
+          <div class="chat-header-title">
+            <span>💬</span>
+            <span>Live Chemistry Feed</span>
+          </div>
+          <div class="chat-status-pill" id="chat-connection-status">● Live Socket Active</div>
+        </div>
+
+        <div id="chat-log" class="chat-messages">
+          <div class="status-bubble">Awaiting transmission between specimens...</div>
+        </div>
+
+        <form id="message-form" class="chat-input-form">
+          <input id="message-input" class="chat-input" type="text" autocomplete="off" placeholder="Type something charming..." maxlength="500" autofocus>
+          <button type="submit" class="chat-send-btn">
+            <span>Send</span>
+            <span>⚡</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Right Column: Connectome Cockpit (DESKTOP ONLY — hidden on mobile) -->
+      <aside class="cockpit-column" id="brain-tab-panel">
+        <!-- 3D Specimen Dish Card -->
+        <div class="specimen-dish-card glass-panel" id="fly-panel" data-state="idle" data-lens="shared">
+          <div class="specimen-dish-header">
+            <div class="specimen-title">
+              <span>🧠</span>
+              <span>Fly Brain Specimen</span>
+            </div>
+            <div class="fly-state-badge" id="fly-state" data-state="idle">IDLE</div>
+          </div>
+
+          <!-- Interactive 3D WebGL Canvas -->
+          <div id="specimen-dish-viewport" class="specimen-viewport-container">
+            <div class="specimen-overlay-hud">
+              <span class="hud-tag">497 Neurons | 2.3k Synapses</span>
+              <button type="button" class="hud-fire-btn" id="trigger-pulse-btn">⚡ Fire Synapse Wave</button>
+            </div>
+          </div>
+
+          <!-- Lens Selector -->
+          <div class="lens-bar" role="group" aria-label="Circuit lens">
+            <button type="button" class="ctrl-btn active" data-lens-choice="shared">Shared</button>
+            <button type="button" class="ctrl-btn" data-lens-choice="divergent">Divergent</button>
+            <button type="button" class="ctrl-btn" data-lens-choice="wildtype">Wild-type</button>
+          </div>
+          <p id="lens-caption"></p>
+        </div>
+
+        <!-- Fly Diary & Realtime Circuit Judge Box -->
+        <div class="fly-diary-card glass-panel">
+          <div class="diary-label">
+            <span>🪰</span>
+            <span>Fly Inner Monologue</span>
+          </div>
+          <p id="fly-diary" class="diary-quote">"Watching your text chemistry... send a message to trigger action potentials."</p>
+          <div id="fly-judge" class="circuit-judge-box">
+            <div class="judge-region" id="judge-region">Whole Circuit</div>
+            <div class="judge-plain" id="judge-plain">Nothing much is happening yet — the fly is still waiting to be impressed.</div>
+            <div class="judge-technical" id="judge-technical">Circuit's quiet — mAL, pC1, and pIP10 are all sitting near baseline.</div>
+          </div>
+        </div>
+
+        <!-- Chemistry Telemetry Card -->
+        <div class="telemetry-card glass-panel">
+          <div class="meter-header">
+            <span class="meter-title">Courtship Accumulator (pC1 Arousal)</span>
+            <span class="meter-percent" id="meter-percent-label">0%</span>
+          </div>
+
+          <div class="meter-track-modern">
+            <div id="meter-fill" class="meter-fill-modern"></div>
+          </div>
+
+          <div class="metrics-subgrid">
+            <div class="metric-pill">
+              <span class="metric-pill-label">Warmth</span>
+              <span class="metric-pill-val" id="metric-warmth">0.00</span>
+            </div>
+            <div class="metric-pill">
+              <span class="metric-pill-label">Humor</span>
+              <span class="metric-pill-val" id="metric-humor">0.00</span>
+            </div>
+            <div class="metric-pill">
+              <span class="metric-pill-label">Reciprocity</span>
+              <span class="metric-pill-val" id="metric-reciprocity">0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Manual Verdict Trigger -->
+        <a
+          id="verdict-btn"
+          class="verdict-btn"
+          data-min="{{ min_messages_for_verdict }}"
+          aria-disabled="true"
+          tabindex="-1"
+        >
+          🎯 Get Verdict <span id="verdict-btn-progress">(0/{{ min_messages_for_verdict }} each)</span>
+        </a>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='fly_brain_core.js') }}"></script>
+  <script src="{{ url_for('static', filename='info-toggle.js') }}"></script>
+  <script src="{{ url_for('static', filename='chat.js') }}"></script>
+</body>
+</html>

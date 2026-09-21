@@ -1,0 +1,11 @@
+.venv
+Claude/
+local
+*db
+*.md
+.env
+circuit_state.json
+stats_state.json
+best_quote.json
+neurons.csv
+connections.csv

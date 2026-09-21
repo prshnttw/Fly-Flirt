@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>🧠 Live Drosophila Connectome — 3D Spectator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body class="brain-spectator-page">
+  <!-- Top Floating Header -->
+  <header class="spectator-header glass-panel">
+    <div class="nav-brand">
+      <span style="font-size: 1.5rem;">🧠</span>
+      <div>
+        <h1 class="brand-title" style="font-size: 1.15rem; margin:0;">Drosophila Connectome Live Spectator</h1>
+        <p style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); margin:0;">
+          497 MaleCNS v1.0 Neurons • 2,296 Real Synapses • Drag to Orbit • Pinch to Zoom
+        </p>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <div class="fly-state-badge" id="spectator-state-badge" data-state="idle">LISTENING</div>
+      <a href="{{ url_for('landing') }}" class="nav-link-btn">
+        <span>🏠</span>
+        <span>Home</span>
+      </a>
+      <a href="{{ url_for('chat') }}" class="nav-link-btn">
+        <span>💬</span>
+        <span>Back to Chat</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Fullscreen WebGL Canvas Wrapper -->
+  <div id="scene" class="spectator-canvas-wrap"></div>
+
+  <!-- Interactive 3D Node Hover Tooltip -->
+  <div id="node-tooltip" class="node-hover-tooltip">
+    <div id="tooltip-title" style="font-weight:700; color:var(--neon-cyan); margin-bottom:2px;">pC1_14a (#10666)</div>
+    <div id="tooltip-meta" style="color:var(--text-secondary); font-size:0.68rem;">Role: Accumulator | NT: Acetylcholine</div>
+    <div id="tooltip-activity" style="color:var(--neon-gold); font-size:0.68rem; margin-top:2px;">Activation: 0.00</div>
+  </div>
+
+  <!-- Floating Region Activity Equalizer Panel -->
+  <aside class="spectator-regions-panel glass-panel" id="spectator-regions">
+    <div style="font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; color: var(--neon-cyan); margin-bottom: 0.25rem;">
+      Regional Potentials
+    </div>
+    <div class="region-item" data-region="optic_lobe">
+      <span>Optic Lobe</span>
+      <div class="region-bar-track">
+        <div class="region-bar-fill" style="width: 15%;"></div>
+      </div>
+    </div>
+    <div class="region-item" data-region="mushroom_body">
+      <span>Mushroom Body</span>
+      <div class="region-bar-track">
+        <div class="region-bar-fill" style="width: 15%;"></div>
+      </div>
+    </div>
+    <div class="region-item" data-region="courtship_center">
+      <span>Courtship Center</span>
+      <div class="region-bar-track">
+        <div class="region-bar-fill" style="width: 15%; background: var(--neon-gold);"></div>
+      </div>
+    </div>
+    <div class="region-item" data-region="decision_center">
+      <span>Decision Center</span>
+      <div class="region-bar-track">
+        <div class="region-bar-fill" style="width: 15%;"></div>
+      </div>
+    </div>
+    <div class="region-item" data-region="nerve_cord">
+      <span>Nerve Cord</span>
+      <div class="region-bar-track">
+        <div class="region-bar-fill" style="width: 15%; background: var(--neon-pink);"></div>
+      </div>
+    </div>
+    <div class="region-item" data-region="dead_synapse">
+      <span>Dead Synapse</span>
+      <div class="region-bar-track">
+        <div class="region-bar-fill" style="width: 10%; background: var(--text-muted);"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Floating Control HUD Bar -->
+  <div class="spectator-controls-bar">
+    <button type="button" class="ctrl-btn active" data-view="isometric">Isometric</button>
+    <button type="button" class="ctrl-btn" data-view="courtship">Courtship Focus (pC1)</button>
+    <button type="button" class="ctrl-btn" data-view="dorsal">Dorsal</button>
+    <button type="button" class="ctrl-btn" data-view="lateral">Lateral</button>
+    <button type="button" class="ctrl-btn" id="spectator-pulse-trigger" style="background: rgba(0, 245, 212, 0.15); border-color: var(--neon-cyan); color: var(--neon-cyan);">
+      ⚡ Fire Action Potential
+    </button>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="{{ url_for('static', filename='fly_brain_core.js') }}"></script>
+  <script src="{{ url_for('static', filename='fly_brain.js') }}"></script>
+</body>
+</html>
