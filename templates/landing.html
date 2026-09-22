@@ -1,119 +1,87 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Fly//Flirt — What happens when a real fly brain reads your conversation?</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-</head>
-<body>
-  <div id="landing-canvas-bg" class="landing-canvas-bg"></div>
+{% extends "base.html" %}
+{% block body_class %}landing-body{% endblock %}
+{% block body %}
+<div id="bg" class="bg-brain" aria-hidden="true"></div>
+<main class="landing">
+  <section class="landing-card glass">
+    <span class="badge"><span class="dot live"></span><span>MaleCNS v1.0 · <b id="s-neurons">{{ "{:,}".format(boot.stats.neurons) }}</b> real neurons · <b id="s-syn">{{ "{:,}".format(boot.stats.synapses) }}</b> real synapses</span></span>
 
-  <main class="landing-container">
-    <div class="landing-card glass-panel">
-      <div class="brand-badge">
-        <span class="pulse-dot"></span>
-        <span>MaleCNS v1.0 Connectome</span>
-      </div>
+    <h1 class="title">🪰 Fly<span class="slash">//</span>Flirt</h1>
+    <p class="tagline">
+      What happens when a real fly brain reads your conversation?
+      <span class="info-wrap">
+        <button type="button" class="info-btn" data-info aria-expanded="false" aria-label="What is this?">i</button>
+        <span class="info-pop" hidden>Fly//Flirt maps conversational signals onto a biologically grounded Drosophila courtship circuit and simulates how activity propagates through its real connectivity.</span>
+      </span>
+    </p>
 
-      <h1 class="landing-title">🪰 Fly//Flirt</h1>
-      <p class="landing-tagline">
-        What happens when a real fly brain reads your conversation?
-        <span class="info-wrap">
-          <button type="button" class="info-btn" data-info-toggle aria-expanded="false" aria-label="What is this?">i</button>
-          <span class="info-popover" data-info-popover hidden>
-            Fly Chat maps conversational signals onto a biologically grounded Drosophila courtship circuit and simulates how activity propagates through its real connectivity.
-          </span>
-        </span>
-      </p>
-
-      {% with messages = get_flashed_messages() %}
-        {% if messages %}
-          <div class="flash" style="background: rgba(255, 0, 127, 0.15); border: 1px solid var(--neon-pink); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.5rem; font-size: 0.88rem; color: #fff;">
-            {% for message in messages %}
-              <p>{{ message }}</p>
-            {% endfor %}
-          </div>
-        {% endif %}
-      {% endwith %}
-
-      <div class="role-grid">
-        {% if taken.male %}
-          <div class="role-card role-male disabled">
-            <span class="role-icon">🪰</span>
-            <span class="role-name">Male Specimen</span>
-            <span class="role-status">Occupied</span>
-          </div>
-        {% else %}
-          <a class="role-card role-male" href="{{ url_for('choose_role', role='male') }}">
-            <span class="role-icon">🪰</span>
-            <span class="role-name">Male Specimen</span>
-            <span class="role-status">Ready to Enter →</span>
-          </a>
-        {% endif %}
-
-        {% if taken.female %}
-          <div class="role-card role-female disabled">
-            <span class="role-icon">🌸</span>
-            <span class="role-name">Female Specimen</span>
-            <span class="role-status">Occupied</span>
-          </div>
-        {% else %}
-          <a class="role-card role-female" href="{{ url_for('choose_role', role='female') }}">
-            <span class="role-icon">🌸</span>
-            <span class="role-name">Female Specimen</span>
-            <span class="role-status">Ready to Enter →</span>
-          </a>
-        {% endif %}
-      </div>
-
-      <div class="connectome-pills">
-        <div class="pill-item">⚡ 497 Real Neurons</div>
-        <div class="pill-item">🧬 2,296 Synaptic Edges</div>
-        <div class="pill-item">🧠 Realtime Leaky Integrator</div>
-      </div>
-
-      <div class="landing-secondary-links">
-        <a href="{{ url_for('fly_brain_page') }}" class="nav-link-btn">
-          <span>🧠</span>
-          <span>Watch the Live Fly Brain</span>
-        </a>
-        <a href="{{ url_for('circuit_card_page') }}" class="nav-link-btn">
-          <span>📊</span>
-          <span>View a Sample Circuit Card</span>
-        </a>
-      </div>
-
-      <a href="{{ url_for('reset_demo') }}" class="reset-demo-link" onclick="return confirm('Reset the whole demo? This clears both seats and the current conversation’s progress.');">
-        🔄 Reset demo for a new pair
-      </a>
+    {% if resume %}
+    <div class="resume">
+      <span>You have a chat in progress ({{ resume[0].messages }} messages).</span>
+      <a class="btn btn-sm btn-primary" href="{{ resume[0].url }}">Resume</a>
     </div>
-  </main>
+    {% endif %}
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="{{ url_for('static', filename='fly_brain_core.js') }}"></script>
-  <script src="{{ url_for('static', filename='info-toggle.js') }}"></script>
-  <script>
-    // Initialize ambient 3D connectome background
-    window.addEventListener('DOMContentLoaded', () => {
-      const bg = new FlyBrainVisualizer('landing-canvas-bg', {
-        autoRotate: true,
-        autoRotateSpeed: 0.0018,
-        enableControls: false,
-        interactive: false,
-        cameraDistance: 2.1,
-        fov: 60,
-        showEdges: true
-      });
-      // Ambient synaptic firings every few seconds
-      setInterval(() => {
-        if (bg && bg.triggerSynapticFiring) {
-          bg.triggerSynapticFiring(0.8 + Math.random() * 0.6);
-        }
-      }, 3500);
-    });
-  </script>
-</body>
-</html>
+    <div class="nick-row">
+      <label class="sr-only" for="nick">Nickname (optional)</label>
+      <input class="input" id="nick" maxlength="18" placeholder="Nickname (optional)" autocomplete="nickname">
+    </div>
+
+    <div id="home-step" class="wizard">
+      <div class="modes two">
+        <button class="mode-btn enter" type="button" id="go-enter">
+          <span class="ic">💬</span><span class="nm">Enter chat</span><span class="sb">meet someone online</span>
+        </button>
+        <a class="mode-btn friends" id="go-invite" href="{{ url_for('pages.invite') }}">
+          <span class="ic">🤝</span><span class="nm">Invite your buddy</span><span class="sb">chat with a code</span>
+        </a>
+      </div>
+    </div>
+
+    <div id="gender-step" class="wizard" hidden>
+      <p class="wiz-q">First, who are you?</p>
+      <div class="modes">
+        <button class="mode-btn male" type="button" data-gender="male"><span class="ic">🪰</span><span class="nm">Male</span></button>
+        <button class="mode-btn female" type="button" data-gender="female"><span class="ic">🌸</span><span class="nm">Female</span></button>
+        <button class="mode-btn friends" type="button" data-gender="friends"><span class="ic">🙂</span><span class="nm">Prefer not to say</span></button>
+      </div>
+      <button class="btn btn-sm btn-ghost wiz-back" type="button" data-back="home-step">← Back</button>
+    </div>
+
+    <div id="seek-step" class="wizard" hidden>
+      <p class="wiz-q">Who would you like to chat with?</p>
+      <div class="modes">
+        <button class="mode-btn female" type="button" data-seek="female"><span class="ic">🌸</span><span class="nm">A female</span></button>
+        <button class="mode-btn male" type="button" data-seek="male"><span class="ic">🪰</span><span class="nm">A male</span></button>
+        <button class="mode-btn friends" type="button" data-seek="any"><span class="ic">✨</span><span class="nm">Anyone</span></button>
+      </div>
+      <button class="btn btn-sm btn-ghost wiz-back" type="button" data-back="gender-step">← Back</button>
+    </div>
+
+    <div class="stat-pills" aria-live="polite">
+      <span class="pill"><span class="dot live"></span><b id="s-online">{{ boot.stats.online }}</b> online</span>
+      <span class="pill"><b id="s-waiting">{{ boot.stats.waiting_total }}</b> waiting for a match</span>
+      <span class="pill"><b id="s-today">{{ boot.stats.chats_today }}</b> chats today</span>
+    </div>
+
+    <div class="steps">
+      <div class="step"><b>1 · Pair up</b>Enter the chat and we match you with someone online, or invite a buddy with a code.</div>
+      <div class="step"><b>2 · Chat</b>An AI scores each message; real neurons and synapses fire in 3D as you talk.</div>
+      <div class="step"><b>3 · Read the verdict</b>See how many neurons your chat recruited, and which message caused what.</div>
+    </div>
+
+    <p class="privacy-note">Heads up: messages are sent to an AI service (Groq) to be analysed and are kept for {{ retention_days }} days so your verdict works. Please don't share personal or sensitive information.</p>
+    <div class="landing-links">
+      <a class="btn btn-sm btn-ghost" href="{{ url_for('pages.lab') }}">🧠 Watch the live lab</a>
+      <a class="btn btn-sm btn-ghost" href="{{ url_for('pages.how') }}">How it works</a>
+    </div>
+  </section>
+  {% include "_footer.html" %}
+</main>
+{% endblock %}
+{% block libs %}
+<script src="{{ url_for('static', filename='vendor/three.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/brain.js') }}?v={{ asset_v }}"></script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/landing.js') }}?v={{ asset_v }}"></script>{% endblock %}

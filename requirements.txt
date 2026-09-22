@@ -1,6 +1,2 @@
-flask
-flask-socketio
-python-dotenv
-simple-websocket
-neuprint-python
-groq
+-r requirements-runtime.txt
+neuprint-python   # only for tools/build_connectome.py (offline)

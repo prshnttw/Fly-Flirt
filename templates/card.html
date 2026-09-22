@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}A fly brain read this conversation · Fly//Flirt{% endblock %}
+{% block body %}
+<div class="page">
+  <header class="topbar glass" style="margin-bottom:1rem">
+    <a class="brand" href="{{ url_for('pages.landing') }}">🪰 <span>Fly<span class="slash">//</span>Flirt</span></a>
+    <div class="actions"><a class="btn btn-sm btn-primary" href="{{ url_for('pages.landing') }}">Try it yourself →</a></div>
+  </header>
+
+  <div id="loading" class="loading glass"><div class="spinner"></div><p>Loading the fly's verdict…</p></div>
+
+  <div id="content" hidden>
+    <section class="hero glass">
+      <span class="tier" id="tier"></span>
+      <h1 id="headline"></h1>
+      <div class="bigstats">
+        <div class="bigstat"><b id="b-cells">0</b><small>neurons activated</small><span class="of" id="b-cells-of"></span></div>
+        <div class="bigstat"><b id="b-edges">0</b><small>connections activated</small><span class="of" id="b-edges-of"></span></div>
+        <div class="bigstat"><b id="b-meter">0%</b><small>hub activation</small><span class="of" id="b-peak"></span></div>
+        <div class="bigstat"><b id="b-msgs">0</b><small>messages read</small><span class="of">by a real fly brain</span></div>
+      </div>
+    </section>
+
+    <div class="split">
+      <section class="panel glass">
+        <div class="panel-title" style="margin-bottom:.6rem">🧠 The neurons this conversation lit up</div>
+        <div class="brain-wrap"><div class="brain-view" id="brain"></div><div class="legend" id="legend"></div></div>
+      </section>
+      <section class="panel glass">
+        <h3 class="h3">Where the activity landed</h3>
+        <div class="rolebars" id="rolebars"></div>
+        <h3 class="h3" style="margin-top:1.2rem">Strongest real pathways</h3>
+        <div class="paths" id="sigpaths"></div>
+      </section>
+    </div>
+
+    <section class="panel glass" style="text-align:center;margin-bottom:1rem">
+      <h3 class="h3">What happens when a real fly brain reads your conversation?</h3>
+      <p class="muted" style="margin:.2rem 0 1rem;font-size:.9rem">Chat with a friend or a stranger and watch real neurons and synapses fire, live.</p>
+      <a class="btn btn-hot" href="{{ url_for('pages.landing') }}">🪰 Start a chat</a>
+    </section>
+    <p class="callout" id="disclaimer"></p>
+  </div>
+
+  <div id="failure" class="loading glass" hidden><p>This card doesn't exist or isn't ready yet.</p>
+    <div class="row" style="margin-top:1rem"><a class="btn btn-primary" href="{{ url_for('pages.landing') }}">Home</a></div></div>
+  {% include "_footer.html" %}
+</div>
+{% endblock %}
+{% block libs %}
+<script src="{{ url_for('static', filename='vendor/three.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/brain.js') }}?v={{ asset_v }}"></script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/card.js') }}?v={{ asset_v }}"></script>{% endblock %}

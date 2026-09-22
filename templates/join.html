@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}You're invited · Fly//Flirt{% endblock %}
+{% block body %}
+<main class="center-page">
+  <section class="match-card glass">
+    {% if code %}
+      <div class="radar found" aria-hidden="true" style="width:120px;height:120px"><span></span><span></span><div class="core" style="inset:38px;font-size:1.4rem">🪰</div></div>
+      <h1 class="match-title">You're invited to a chat</h1>
+      <p class="muted">Someone wants to talk with you while a real fruit-fly brain reads along.</p>
+      <div class="big-code" aria-label="Invite code">{{ code }}</div>
+      <div class="nick-row"><label class="sr-only" for="nick">Nickname (optional)</label>
+        <input class="input" id="nick" maxlength="18" placeholder="Your nickname (optional)" style="text-align:center"></div>
+      <button class="btn btn-primary btn-block" id="join" type="button">Join the chat</button>
+      <p class="muted" id="err" style="margin-top:.9rem;font-size:.85rem" role="alert"></p>
+      <p class="privacy-note">Messages are analysed by an AI service (Groq) and kept for {{ retention_days }} days. Please don't share sensitive information.</p>
+    {% else %}
+      <h1 class="match-title">That code doesn't look right</h1>
+      <p class="muted">Invite codes are 6 characters, for example <span class="mono">K7QF2M</span>. Check with your friend and try again.</p>
+    {% endif %}
+    <div class="row" style="margin-top:1.2rem"><a class="btn btn-ghost" href="{{ url_for('pages.landing') }}">← Home</a></div>
+  </section>
+</main>
+{% endblock %}
+{% block libs %}<script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>{% endblock %}
+{% block scripts %}{% if code %}<script src="{{ url_for('static', filename='js/join.js') }}?v={{ asset_v }}"></script>{% endif %}{% endblock %}

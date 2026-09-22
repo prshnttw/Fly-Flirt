@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}How it works · Fly//Flirt{% endblock %}
+{% block body %}
+<div class="prose">
+  <p><a href="{{ url_for('pages.landing') }}">← Home</a></p>
+  <h1>How Fly//Flirt works</h1>
+  <p>Two people chat. An AI reads each message and turns it into seven numbers. Those numbers drive real neurons in a fruit fly's brain, and the activity spreads through the fly's real synapses. You watch it happen in 3D, and at the end you get a verdict that says <em>which of your messages caused which neurons and connections to fire</em>.</p>
+
+  <h2>The connectome is real</h2>
+  <p>The wiring diagram comes from the <strong>MaleCNS v1.0</strong> connectome (Janelia FlyEM), the complete map of a male fruit fly's central nervous system: about 166,000 neurons. We use a <strong>{{ "{:,}".format(summary.cells) }}-cell subgraph</strong> with <strong>{{ "{:,}".format(summary.edges) }} real synaptic connections</strong>, built around the <code>pC1</code> courtship hub (the cells that keep a male fly in a courtship state) and its strongest real partners. Each cell's position, neurotransmitter prediction and synapse counts are real data.</p>
+  <table>
+    <thead><tr><th>Role</th><th>Cells in our subgraph</th></tr></thead>
+    <tbody>
+    {% for role, n in summary.by_role.items() %}<tr><td>{{ role }}</td><td>{{ n }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+
+  <h2>From words to neurons</h2>
+  <p>Each message is scored on seven qualities. Each quality drives a real input population that feeds the courtship hub. <strong>This mapping is our modelling choice</strong>; the populations and their wiring are real.</p>
+  <table>
+    <thead><tr><th>Message quality</th><th>Drives real neurons</th><th>Kind</th></tr></thead>
+    <tbody>{% for row in legend %}<tr><td>{{ row.drivers }}</td><td>{{ row.population }}</td><td>{{ row.cells }}</td></tr>{% endfor %}</tbody>
+  </table>
+  <p>The two <code>mAL</code> populations are GABAergic: they act as a <em>brake</em> on the hub. Warmth and reciprocity release the brake (disinhibition); tension tightens it. So friction genuinely works against chemistry in the circuit.</p>
+
+  <h2>Who caused what</h2>
+  <p>Each neuron's activity is updated with a leaky, thresholded rule. Because the rule is applied neuron by neuron, the result can be split <em>exactly</em> into per-message contributions that add up to the true state. A connection is credited to the message that drove its sending neuron. That's how the verdict can say "message 4 was responsible for these neurons and these connections", and the numbers always add up.</p>
+
+  <div class="callout"><strong>It's a cartoon, not destiny.</strong> This is a playful visualisation, not a compatibility test. The fly circuit is real; the mapping from chat to neurons is ours. Please don't make life decisions based on it.</div>
+
+  <h2>The AI, and what happens when it's busy</h2>
+  <p>Messages are analysed by free-tier language models. Each model has its own rate limits, so Fly//Flirt tries an ordered chain
+  {% if chain %}(<span class="mono">{{ chain|join(' → ') }}</span>){% endif %}
+  and skips any model that is cooling down or near its daily quota. If every model is unavailable, a built-in local scorer takes over instantly, so the chat and the brain never stop. Your cockpit tells you when the local scorer was used.</p>
+
+  <h2 id="privacy">Privacy</h2>
+  <ul>
+    <li>No accounts. We set one random session cookie so the server knows which chat is yours.</li>
+    <li>Your messages are sent to an AI provider (Groq) for analysis. Don't share personal or sensitive information.</li>
+    <li>Messages and their analysis are stored for {{ retention_days }} days so verdicts and reconnects work, then deleted.</li>
+    <li>Only the two people in a chat can see it. The shareable card contains numbers and anatomy only, never message text.</li>
+    <li>You can leave a chat at any time, and report a conversation from your verdict page.</li>
+  </ul>
+  <p><a class="btn btn-primary" href="{{ url_for('pages.landing') }}">Start a chat</a></p>
+</div>
+{% include "_footer.html" %}
+{% endblock %}

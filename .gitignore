@@ -1,9 +1,14 @@
-.venv
+.venv/
 Claude/
 local
 *db
 *.md
+!README.md
 .env
+__pycache__/
+*.pyc
+instance/
+tools/cache/
 circuit_state.json
 stats_state.json
 best_quote.json

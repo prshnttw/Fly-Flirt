@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Finding your match · Fly//Flirt{% endblock %}
+{% block body %}
+<div id="bg" class="bg-brain" aria-hidden="true" style="opacity:.45"></div>
+<main class="center-page">
+  <section class="match-card glass" aria-live="polite">
+    <div class="radar" id="radar" aria-hidden="true">
+      <span></span><span></span><span></span>
+      <div class="core">🪰</div>
+    </div>
+    <h1 class="match-title" id="title">
+      {% if boot.seeking == 'female' %}Looking for a female to chat with…
+      {% elif boot.seeking == 'male' %}Looking for a male to chat with…
+      {% else %}Looking for someone to chat with…{% endif %}
+    </h1>
+    <p class="muted" id="sub">Scanning for people online right now.</p>
+
+    <div class="timer"><span id="elapsed">0:00</span> / <span id="limit">{{ (match_timeout // 60) }}:{{ '%02d' % (match_timeout % 60) }}</span></div>
+    <div class="bar" aria-hidden="true"><i id="prog"></i></div>
+
+    <div class="queue-counts">
+      <span class="pill"><span class="dot live"></span><b id="c-online">–</b> online</span>
+      <span class="pill">🪰 <b id="c-male">–</b> male waiting</span>
+      <span class="pill">🌸 <b id="c-female">–</b> female waiting</span>
+      <span class="pill">🤝 <b id="c-friends">–</b> friends waiting</span>
+    </div>
+
+    <div id="invite" class="invite-box" hidden>
+      <h3 id="invite-title">Nobody's around yet. Invite a friend instead!</h3>
+      <p class="muted" style="font-size:.85rem">Share this code or link. When they join, you'll both be dropped straight into the chat.</p>
+      <div class="big-code" id="code" aria-label="Invite code">------</div>
+      <div class="invite-link" id="link"></div>
+      <div class="row">
+        <button class="btn btn-primary btn-sm" id="copy-code" type="button">Copy code</button>
+        <button class="btn btn-sm" id="copy-link" type="button">Copy link</button>
+        <button class="btn btn-sm" id="share" type="button" hidden>Share…</button>
+      </div>
+      <p class="muted" style="font-size:.74rem;margin-top:.7rem">We'll keep looking for a match in the background too, and this code stays valid for <span id="ttl">30</span> minutes.</p>
+    </div>
+
+    <div class="row" style="margin-top:1.3rem">
+      <button class="btn btn-primary" id="retry" type="button" hidden>↻ Try again</button>
+      <button class="btn" id="invite-btn" type="button">🔗 Invite a friend instead</button>
+      <button class="btn btn-danger" id="cancel" type="button">Cancel</button>
+    </div>
+    <p class="conn-state"><span class="dot live" id="cdot"></span><span id="cstate">connecting…</span></p>
+  </section>
+</main>
+{% endblock %}
+{% block libs %}
+<script src="{{ url_for('static', filename='vendor/three.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/brain.js') }}?v={{ asset_v }}"></script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/match.js') }}?v={{ asset_v }}"></script>{% endblock %}

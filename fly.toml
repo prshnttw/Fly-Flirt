@@ -1,0 +1,32 @@
+app = "fly-flirt"
+primary_region = "bom"
+
+[build]
+
+[env]
+  APP_ENV = "production"
+  DATA_DIR = "/data"
+  PORT = "8080"
+  SESSION_COOKIE_SECURE = "true"
+
+[[mounts]]
+  source = "flyflirt_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"   # rooms are in memory; never stop the only machine
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1024mb"   # the optional full-pathway brain adds ~75 MB once loaded

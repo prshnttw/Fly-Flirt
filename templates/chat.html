@@ -1,189 +1,100 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>🪰 Fly//Flirt — Live Drosophila Courtship Circuit</title>
-  <meta name="description" content="Real-time courtship chemistry simulation powered by a biological Drosophila connectome (MaleCNS v1.0). Chat, watch neurons fire, and see courtship accumulate live.">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-</head>
-<body data-role="{{ role }}">
-  <div class="app-container">
-    <!-- Top Navigation Bar -->
-    <header class="top-navbar glass-panel">
-      <div class="nav-brand">
-        <span style="font-size: 1.4rem;">🪰</span>
-        <span class="brand-title">Fly//Flirt</span>
-        <span class="info-wrap">
-          <button type="button" class="info-btn" data-info-toggle aria-expanded="false" aria-label="What is this?">i</button>
-          <span class="info-popover" data-info-popover hidden>
-            Fly Chat maps conversational signals onto a biologically grounded Drosophila courtship circuit and simulates how activity propagates through its real connectivity.
-          </span>
-        </span>
-        <span class="nav-session-role role-{{ role }}">
-          <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
-          {{ role }} specimen
-        </span>
-      </div>
-      <div class="nav-actions">
-        <a href="{{ url_for('landing') }}" class="nav-link-btn">
-          <span>🏠</span>
-          <span>Home</span>
-        </a>
-        <a href="{{ url_for('fly_brain_page') }}" target="_blank" rel="noopener" class="nav-link-btn">
-          <span>🧠</span>
-          <span>Full 3D Spectator</span>
-        </a>
-        <a href="{{ url_for('circuit_card_page') }}" target="_blank" rel="noopener" class="nav-link-btn">
-          <span>📊</span>
-          <span>Circuit Card</span>
-        </a>
-      </div>
-    </header>
-
-    <!-- ===== MOBILE-ONLY: Compact inline Brain + Verdict HUD ===== -->
-    <!-- This ensures verdict + fly brain remain visible on mobile during chat -->
-    <div class="mobile-inline-hud" id="mobile-inline-hud">
-      <div class="mobile-hud-row">
-        <!-- Mini 3D brain viewport -->
-        <div class="mobile-brain-mini" id="mobile-brain-viewport">
-          <span class="hud-tag">497 Neurons</span>
-        </div>
-        <!-- Verdict / diary strip -->
-        <div class="mobile-verdict-strip glass-panel" style="padding: 0.5rem 0.65rem;">
-          <div class="fly-state-badge" id="mobile-fly-state" data-state="idle">IDLE</div>
-          <p class="diary-quote" id="mobile-fly-diary">"Waiting for signals..."</p>
-          <div class="circuit-judge-box" id="mobile-fly-judge">
-            <div class="judge-region" id="mobile-judge-region">Whole Circuit</div>
-            <div class="judge-plain" id="mobile-judge-plain">Nothing much is happening yet.</div>
-          </div>
-        </div>
-      </div>
-      <!-- Compact meter bar -->
-      <div class="mobile-meter-strip">
-        <span class="meter-title">pC1 Arousal</span>
-        <div class="meter-track-modern">
-          <div class="meter-fill-modern" id="mobile-meter-fill"></div>
-        </div>
-        <span class="meter-percent" id="mobile-meter-percent">0%</span>
-      </div>
+{% extends "base.html" %}
+{% block title %}Chat · Fly//Flirt{% endblock %}
+{% block body_class %}chat-body{% endblock %}
+{% block body_attrs %} data-mode="{{ mode }}"{% endblock %}
+{% block body %}
+<div class="app">
+  <header class="topbar glass">
+    <a class="brand" href="{{ url_for('pages.landing') }}" title="Home">🪰 <span>Fly<span class="slash">//</span>Flirt</span></a>
+    <div class="who">
+      <span class="tone-chip" id="me-chip">you</span>
+      <span class="muted hide-sm">chatting with</span>
+      <span class="tone-chip" id="you-chip">…</span>
     </div>
+    <div class="actions">
+      <a class="btn btn-sm btn-ghost" href="{{ url_for('pages.how') }}" target="_blank" rel="noopener"><span>ⓘ</span><span class="label">How it works</span></a>
+      <button class="btn btn-sm" id="next" type="button" hidden title="End this chat and meet someone else"><span>⏭</span><span class="label">Next person</span></button>
+      <button class="btn btn-sm btn-ghost" id="block" type="button" title="Block this person and end the chat"><span>🚫</span><span class="label">Block</span></button>
+      <button class="btn btn-sm btn-ghost" id="report" type="button" title="Report this conversation"><span>⚑</span><span class="label">Report</span></button>
+      <button class="btn btn-sm btn-danger" id="leave" type="button"><span>✕</span><span class="label">Leave</span></button>
+    </div>
+  </header>
 
-    <!-- Main Cockpit Split Grid -->
-    <div class="cockpit-grid">
-      <!-- Left Column: Chat Stream -->
-      <section class="chat-column glass-panel" id="chat-tab-panel">
-        <div class="chat-header">
-          <div class="chat-header-title">
-            <span>💬</span>
-            <span>Live Chemistry Feed</span>
-          </div>
-          <div class="chat-status-pill" id="chat-connection-status">● Live Socket Active</div>
+  <div class="grid">
+    <section class="chat-col glass" aria-label="Conversation">
+      <div class="chat-head">
+        <h2>💬 <span id="room-title">Live chat</span></h2>
+        <div class="presence" id="presence" aria-live="polite"></div>
+      </div>
+      <div class="notice" id="notice" hidden></div>
+      <div class="msgs" id="msgs" role="log" aria-live="polite" aria-relevant="additions"></div>
+      <div class="typing" id="typing" aria-live="polite"></div>
+      <form class="composer" id="composer" autocomplete="off">
+        <label class="sr-only" for="input">Message</label>
+        <input class="input" id="input" type="text" placeholder="Type something charming…" autocomplete="off" enterkeyhint="send" disabled>
+        <span class="count" id="count"></span>
+        <button class="btn btn-primary" id="send" type="submit" disabled>Send ⚡</button>
+      </form>
+    </section>
+
+    <aside class="cockpit" aria-label="Fly brain">
+      <section class="panel glass">
+        <div class="panel-head">
+          <div class="panel-title">🧠 Fly brain <span class="muted mono" style="font-size:.66rem">MaleCNS · live</span></div>
+          <span class="state" id="state" data-s="idle">idle</span>
         </div>
-
-        <div id="chat-log" class="chat-messages">
-          <div class="status-bubble">Awaiting transmission between specimens...</div>
+        <div class="brain-wrap">
+          <div class="brain-view" id="brain"></div>
+          <div class="hud"><span class="tag"><b id="hud-cells">0</b> / <span id="hud-total">1,350</span> neurons lit</span><span class="tag"><b id="hud-edges">0</b> synapses</span></div>
+          <div class="legend" id="legend"></div>
+          <div class="brain-tip" id="tip-hover" hidden></div>
         </div>
-
-        <form id="message-form" class="chat-input-form">
-          <input id="message-input" class="chat-input" type="text" autocomplete="off" placeholder="Type something charming..." maxlength="500" autofocus>
-          <button type="submit" class="chat-send-btn">
-            <span>Send</span>
-            <span>⚡</span>
-          </button>
-        </form>
+        <div class="scale-row" id="scale-row" hidden>
+          <label class="switch">
+            <input type="checkbox" id="scale-toggle" role="switch">
+            <span class="track" aria-hidden="true"></span>
+            <span><b>Full pathway</b> <span class="muted" id="scale-sub">4,300 neurons · 152,000 synapse pairs</span></span>
+          </label>
+          <p class="muted scale-note" id="scale-note" hidden></p>
+        </div>
       </section>
 
-      <!-- Right Column: Connectome Cockpit (DESKTOP ONLY — hidden on mobile) -->
-      <aside class="cockpit-column" id="brain-tab-panel">
-        <!-- 3D Specimen Dish Card -->
-        <div class="specimen-dish-card glass-panel" id="fly-panel" data-state="idle" data-lens="shared">
-          <div class="specimen-dish-header">
-            <div class="specimen-title">
-              <span>🧠</span>
-              <span>Fly Brain Specimen</span>
-            </div>
-            <div class="fly-state-badge" id="fly-state" data-state="idle">IDLE</div>
-          </div>
-
-          <!-- Interactive 3D WebGL Canvas -->
-          <div id="specimen-dish-viewport" class="specimen-viewport-container">
-            <div class="specimen-overlay-hud">
-              <span class="hud-tag">497 Neurons | 2.3k Synapses</span>
-              <button type="button" class="hud-fire-btn" id="trigger-pulse-btn">⚡ Fire Synapse Wave</button>
-            </div>
-          </div>
-
-          <!-- Lens Selector -->
-          <div class="lens-bar" role="group" aria-label="Circuit lens">
-            <button type="button" class="ctrl-btn active" data-lens-choice="shared">Shared</button>
-            <button type="button" class="ctrl-btn" data-lens-choice="divergent">Divergent</button>
-            <button type="button" class="ctrl-btn" data-lens-choice="wildtype">Wild-type</button>
-          </div>
-          <p id="lens-caption"></p>
+      <section class="panel glass">
+        <div class="panel-head"><div class="panel-title">🪰 What the fly thinks</div><span class="muted mono" style="font-size:.66rem" id="topic"></span></div>
+        <div class="diary" id="diary">“Waiting for the first message…”</div>
+        <div class="tip" id="nexttip" hidden></div>
+        <div class="narration" id="narration" hidden>
+          <div class="region" id="n-region"></div>
+          <div class="plain" id="n-plain"></div>
+          <div class="tech" id="n-tech"></div>
         </div>
+      </section>
 
-        <!-- Fly Diary & Realtime Circuit Judge Box -->
-        <div class="fly-diary-card glass-panel">
-          <div class="diary-label">
-            <span>🪰</span>
-            <span>Fly Inner Monologue</span>
-          </div>
-          <p id="fly-diary" class="diary-quote">"Watching your text chemistry... send a message to trigger action potentials."</p>
-          <div id="fly-judge" class="circuit-judge-box">
-            <div class="judge-region" id="judge-region">Whole Circuit</div>
-            <div class="judge-plain" id="judge-plain">Nothing much is happening yet — the fly is still waiting to be impressed.</div>
-            <div class="judge-technical" id="judge-technical">Circuit's quiet — mAL, pC1, and pIP10 are all sitting near baseline.</div>
-          </div>
+      <section class="panel glass">
+        <div class="meter-row"><span class="label" id="meter-label">Courtship hub activation</span><span class="val" id="meter-val">0%</span></div>
+        <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="meter"><i id="meter-fill"></i></div>
+        <div class="counters">
+          <div class="counter"><b id="k-cells">0</b><span>neurons active</span></div>
+          <div class="counter"><b id="k-edges">0</b><span>synapses active</span></div>
+          <div class="counter"><b id="k-new">+0</b><span>new this message</span></div>
         </div>
+        <div class="params" id="params"></div>
+        <div class="provider" id="provider"></div>
+        <details class="more">
+          <summary>How your words become neurons</summary>
+          <p style="margin:.5rem 0">Each message is scored on 7 parameters. Each parameter drives a real input population of the fly's brain; activity then spreads through real synapses.</p>
+          <table id="legend-table"></table>
+        </details>
+      </section>
 
-        <!-- Chemistry Telemetry Card -->
-        <div class="telemetry-card glass-panel">
-          <div class="meter-header">
-            <span class="meter-title">Courtship Accumulator (pC1 Arousal)</span>
-            <span class="meter-percent" id="meter-percent-label">0%</span>
-          </div>
-
-          <div class="meter-track-modern">
-            <div id="meter-fill" class="meter-fill-modern"></div>
-          </div>
-
-          <div class="metrics-subgrid">
-            <div class="metric-pill">
-              <span class="metric-pill-label">Warmth</span>
-              <span class="metric-pill-val" id="metric-warmth">0.00</span>
-            </div>
-            <div class="metric-pill">
-              <span class="metric-pill-label">Humor</span>
-              <span class="metric-pill-val" id="metric-humor">0.00</span>
-            </div>
-            <div class="metric-pill">
-              <span class="metric-pill-label">Reciprocity</span>
-              <span class="metric-pill-val" id="metric-reciprocity">0.00</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Manual Verdict Trigger -->
-        <a
-          id="verdict-btn"
-          class="verdict-btn"
-          data-min="{{ min_messages_for_verdict }}"
-          aria-disabled="true"
-          tabindex="-1"
-        >
-          🎯 Get Verdict <span id="verdict-btn-progress">(0/{{ min_messages_for_verdict }} each)</span>
-        </a>
-      </aside>
-    </div>
+      <a class="verdict-cta" id="verdict-cta" aria-disabled="true" tabindex="-1">🎯 Get verdict <small id="verdict-progress"></small></a>
+    </aside>
   </div>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="{{ url_for('static', filename='fly_brain_core.js') }}"></script>
-  <script src="{{ url_for('static', filename='info-toggle.js') }}"></script>
-  <script src="{{ url_for('static', filename='chat.js') }}"></script>
-</body>
-</html>
+</div>
+{% endblock %}
+{% block libs %}
+<script src="{{ url_for('static', filename='vendor/three.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/socket.io.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/brain.js') }}?v={{ asset_v }}"></script>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/chat.js') }}?v={{ asset_v }}"></script>{% endblock %}

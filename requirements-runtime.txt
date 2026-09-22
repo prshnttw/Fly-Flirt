@@ -1,6 +1,7 @@
 flask
 flask-socketio
-python-dotenv
 simple-websocket
+python-dotenv
 groq
 numpy
+gunicorn
