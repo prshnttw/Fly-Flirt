@@ -12,9 +12,15 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%AA%B0%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <script src="{{ url_for('static', filename='js/theme.js') }}?v={{ asset_v }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v={{ asset_v }}">
 </head>
 <body class="{% block body_class %}{% endblock %}"{% block body_attrs %}{% endblock %}>
+<div class="appearance-bar">
+  <button class="btn theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode" hidden>
+    <span data-theme-icon aria-hidden="true">☀</span><span data-theme-label>Light mode</span>
+  </button>
+</div>
 {% block body %}{% endblock %}
 <div id="toasts" aria-live="polite"></div>
 <script type="application/json" id="boot">{{ boot|default({})|tojson }}</script>

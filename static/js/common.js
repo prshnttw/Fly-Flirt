@@ -20,7 +20,7 @@
       if (v == null || v === false) return;
       if (k === 'class') node.className = v;
       else if (k === 'text') node.textContent = v;
-      else if (k === 'style' && typeof v === 'object') Object.keys(v).forEach(function (s) { node.style.setProperty(s, v[s]); });
+      else if (k === 'style' && typeof v === 'object') Object.keys(v).forEach(function (s) { node.style.setProperty(s.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); }), v[s]); });
       else if (k.indexOf('on') === 0 && typeof v === 'function') node.addEventListener(k.slice(2), v);
       else node.setAttribute(k, v === true ? '' : v);
     });

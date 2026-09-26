@@ -41,10 +41,24 @@
         })
         .then(function (raw) {
           var n = raw.cells.id.length;
+          // Center display coordinates only; neuron indices and connectivity stay intact.
+          var positions = Float32Array.from(raw.cells.pos);
+          var low = [Infinity, Infinity, Infinity], high = [-Infinity, -Infinity, -Infinity];
+          for (var i = 0; i < positions.length; i++) {
+            var axis = i % 3;
+            low[axis] = Math.min(low[axis], positions[i]);
+            high[axis] = Math.max(high[axis], positions[i]);
+          }
+          var radius = 0;
+          for (var j = 0; j < positions.length; j += 3) {
+            for (var k = 0; k < 3; k++) positions[j + k] -= (low[k] + high[k]) / 2;
+            radius = Math.max(radius, Math.hypot(positions[j], positions[j + 1], positions[j + 2]));
+          }
           return {
             n: n,
             ids: raw.cells.id,
-            pos: Float32Array.from(raw.cells.pos),
+            pos: positions,
+            radius: radius,
             role: Uint8Array.from(raw.cells.role),
             type: Uint16Array.from(raw.cells.type),
             nt: Uint8Array.from(raw.cells.nt),
@@ -184,6 +198,9 @@
     this._buildPulses();
     this._buildOutAdjacency();
 
+    this._theme = this.applyTheme.bind(this);
+    global.addEventListener("ff-theme-change", this._theme);
+    this.applyTheme();
     this._resize = this.resize.bind(this);
     this.resize();
     if (global.ResizeObserver) { this.ro = new ResizeObserver(this._resize); this.ro.observe(this.el); }
@@ -195,6 +212,19 @@
     if (o.interactive) this._bindPointer();
     this._loop = this._loop.bind(this);
     this.raf = global.requestAnimationFrame(this._loop);
+  };
+
+  FlyBrain.prototype.applyTheme = function () {
+    var T = global.THREE, light = document.documentElement.dataset.theme === "light";
+    this.group.traverse(function (object) {
+      if (!object.material) return;
+      object.material.blending = light ? T.NormalBlending : T.AdditiveBlending;
+      object.material.needsUpdate = true;
+    });
+    this.uniforms.uRest.value = light ? Math.max(0.55, this.opts.rest) : this.opts.rest;
+    if (this.baseEdges) this.baseEdges.material.opacity = light ? 0.12 : 0.032;
+    this.focusLines.material.color.set(light ? 0x33234d : 0xffffff);
+    this.dirty = true;
   };
 
   FlyBrain.prototype._buildBaseEdges = function () {
@@ -291,7 +321,13 @@
   FlyBrain.prototype.resize = function () {
     if (!this.renderer) return;
     var w = this.el.clientWidth || 300, h = this.el.clientHeight || 200;
-    this.renderer.setSize(w, h, false);
+    this.renderer.setSize(w, h);
+    // Preserve vertical framing on narrow screens, including portrait phones.
+    var halfFov = (this.opts.fov * Math.PI) / 360;
+    var limitingAngle = Math.min(halfFov, Math.atan(Math.tan(halfFov) * w / h));
+    var fitDistance = Math.max(this.opts.distance, (this.data.radius + 0.05) * 1.08 / Math.sin(limitingAngle));
+    this.camera.position.z *= fitDistance / (this._fitDistance || this.opts.distance);
+    this._fitDistance = fitDistance;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     var pr = this.renderer.getPixelRatio();
@@ -335,7 +371,7 @@
   };
 
   FlyBrain.prototype._zoom = function (dz) {
-    this.camera.position.z = Math.max(1.15, Math.min(4.2, this.camera.position.z + dz));
+    this.camera.position.z = Math.max(1.15, Math.min(Math.max(4.2, this._fitDistance * 1.8), this.camera.position.z + dz));
     this.dirty = true;
   };
 
@@ -581,6 +617,8 @@
     this.disposed = true;
     this.timers.forEach(clearTimeout);
     if (this.raf) cancelAnimationFrame(this.raf);
+    global.removeEventListener("ff-theme-change", this._theme);
+    global.removeEventListener("resize", this._resize);
     if (this.ro) this.ro.disconnect();
     if (this.io) this.io.disconnect();
     if (this.renderer) {
