@@ -12,11 +12,16 @@
       <span class="tone-chip" id="you-chip">…</span>
     </div>
     <div class="actions">
-      <a class="btn btn-sm btn-ghost" href="{{ url_for('pages.how') }}" target="_blank" rel="noopener"><span>ⓘ</span><span class="label">How it works</span></a>
-      <button class="btn btn-sm" id="next" type="button" hidden title="End this chat and meet someone else"><span>⏭</span><span class="label">Next person</span></button>
-      <button class="btn btn-sm btn-ghost" id="block" type="button" title="Block this person and end the chat"><span>🚫</span><span class="label">Block</span></button>
-      <button class="btn btn-sm btn-ghost" id="report" type="button" title="Report this conversation"><span>⚑</span><span class="label">Report</span></button>
-      <button class="btn btn-sm btn-danger" id="leave" type="button"><span>✕</span><span class="label">Leave</span></button>
+      <button class="btn btn-sm" id="next" type="button" hidden title="End this chat and meet someone else">Next person</button>
+      <details class="chat-options" id="chat-options">
+        <summary class="btn btn-sm">Chat options <span aria-hidden="true">⌄</span></summary>
+        <div class="chat-options-list glass">
+          <a class="btn btn-sm btn-ghost" href="{{ url_for('pages.how') }}" target="_blank" rel="noopener">How it works <span class="sr-only">(opens in a new tab)</span></a>
+          <button class="btn btn-sm btn-ghost" id="report" type="button">Report conversation</button>
+          <button class="btn btn-sm btn-ghost" id="block" type="button" title="Block this person and end the chat">Block person</button>
+        </div>
+      </details>
+      <button class="btn btn-sm btn-danger" id="leave" type="button">Leave</button>
     </div>
   </header>
 
@@ -31,9 +36,11 @@
       <div class="typing" id="typing" aria-live="polite"></div>
       <form class="composer" id="composer" autocomplete="off">
         <label class="sr-only" for="input">Message</label>
-        <input class="input" id="input" type="text" placeholder="Type something charming…" autocomplete="off" enterkeyhint="send" disabled>
-        <span class="count" id="count"></span>
-        <button class="btn btn-primary" id="send" type="submit" disabled>Send ⚡</button>
+        <div class="composer-field">
+          <input class="input" id="input" type="text" placeholder="Write a message…" aria-describedby="count" autocomplete="off" enterkeyhint="send" disabled>
+          <span class="count" id="count"></span>
+        </div>
+        <button class="btn btn-primary" id="send" type="submit" disabled>Send</button>
       </form>
     </section>
 

@@ -63,6 +63,7 @@
   function addMessage(m) {
     if (S.bubbles[m.seq]) return S.bubbles[m.seq];
     var p = part(m.slot), mine = m.slot === S.slot;
+    var followMessage = mine || nearBottom();
     var chips = el('div', { class: 'chips' });
     var node = el('div', { class: 'msg ' + (mine ? 'mine' : 'theirs') + (FF.toneIsLight(p) ? ' light' : ''), 'data-seq': m.seq, style: { '--tone': FF.tone(p) } },
       el('div', { class: 'meta' }, el('i'), el('span', { text: (mine ? 'you' : (p ? p.nickname : '?')) + ' · ' + FF.time(m.ts) })),
@@ -71,7 +72,7 @@
     msgsBox.appendChild(node);
     S.bubbles[m.seq] = { node: node, chips: chips };
     if (m.analysed) fillChips(m.seq, m); else chips.appendChild(el('span', { class: 'chip wait', text: 'fly is reading…' }));
-    scrollDown(mine);
+    scrollDown(followMessage);
     return S.bubbles[m.seq];
   }
 
@@ -183,7 +184,7 @@
   }
   function updateCount() {
     var left = S.maxLen - input.value.length;
-    $('#count').textContent = left < 80 ? String(left) : '';
+    $('#count').textContent = left < 80 ? left + ' left' : '';
     $('#count').style.color = left < 20 ? 'var(--red)' : '';
   }
   input.setAttribute('maxlength', String(S.maxLen));
@@ -245,6 +246,7 @@
     S.ready = true;
     updateCount();
     if (S.status === 'active') input.focus();
+    requestAnimationFrame(function () { scrollDown(true); });
   });
 
   function applyStatus() {
@@ -257,7 +259,7 @@
       var code = S.room && S.room.code;
       showNotice(code ? 'Waiting for your friend. Invite code: ' + code : 'Waiting for your friend to join…');
     } else {
-      setComposer(true, 'Type something charming…');
+      setComposer(true, 'Write a message…');
       $('#notice').hidden = true;
     }
   }
@@ -326,6 +328,24 @@
       if (e.code === 'full_busy' || e.code === 'no_full' || e.code === 'bad_scale') { toggle.checked = boot.scale === 'full'; toggle.disabled = false; note.hidden = true; }
     });
   }
+
+  /* Close the native disclosure after a choice, outside click, or Escape. */
+  var options = $('#chat-options'), optionsSummary = options.querySelector('summary');
+  options.addEventListener('click', function (e) {
+    if (e.target.closest('button, a')) {
+      options.open = false;
+      optionsSummary.focus();
+    }
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (!options.contains(e.target)) options.open = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && options.open) {
+      options.open = false;
+      optionsSummary.focus();
+    }
+  });
 
   /* ---------------- safety: skip, block, report ---------------- */
   var prefs = FF.prefs.load();
