@@ -1,6 +1,6 @@
 /* FlyBrain: real-time 3D view of the MaleCNS connectome subgraph.
  *
- * - every cell is a point in one GPU point cloud (1 draw call), resting as a grey dot
+ * - each neuron is one crisp dot in a schematic bilateral matrix (1 draw call)
  * - a chat message plays back as a wave: cells brighten in their role colour, and signal
  *   pulses travel along the real synapses that message drove
  * - a persistent glow shows the room's current activation
@@ -26,7 +26,8 @@
     output: 'Descending output'
   };
   var BASE_SIZE = { context: 0.0105, brake: 0.02, input: 0.0165, accumulator: 0.0195, output: 0.03 };
-  var MAX_ACTIVE = 520;
+  var LINK_VERTICES = 2;
+  var MAX_ACTIVE = 180;
   var MAX_PULSES = 280;
 
   var dataPromises = {};
@@ -77,16 +78,16 @@
 
   var VERT = [
     'attribute vec3 aBase; attribute float aLevel; attribute float aFlash; attribute float aSize;',
-    'uniform float uScale; uniform float uRest;',
+    'uniform float uScale; uniform float uRest; uniform float uLight; uniform float uDpr;',
     'varying vec3 vColor; varying float vAlpha;',
     'void main() {',
     '  float e = clamp(aLevel + aFlash, 0.0, 1.0);',
-    '  vec3 grey = vec3(0.36, 0.36, 0.47);',
+    '  vec3 grey = mix(vec3(0.48, 0.55, 0.67), vec3(0.32, 0.39, 0.49), uLight);',
     '  float k = smoothstep(0.0, 0.3, e);',
-    '  vColor = mix(grey, aBase, k) + vec3(0.5) * aFlash * aFlash;',
+    '  vColor = mix(grey, aBase * (1.0 - 0.52 * uLight), 0.18 + 0.82 * k);',
     '  vAlpha = uRest + (1.0 - uRest) * min(1.0, e * 1.2);',
     '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
-    '  gl_PointSize = aSize * (1.0 + 3.4 * e) * uScale / -mv.z;',
+    '  gl_PointSize = clamp(aSize * uScale / -mv.z, 1.2 * uDpr, 3.8 * uDpr) * (1.0 + 0.65 * e);',
     '  gl_Position = projectionMatrix * mv;',
     '}'
   ].join('\n');
@@ -96,10 +97,30 @@
     '  vec2 c = gl_PointCoord - 0.5;',
     '  float d = length(c);',
     '  if (d > 0.5) discard;',
-    '  float core = smoothstep(0.5, 0.0, d);',
-    '  gl_FragColor = vec4(vColor, vAlpha * (0.3 + 0.7 * core));',
+    '  float core = 1.0 - smoothstep(0.32, 0.5, d);',
+    '  gl_FragColor = vec4(vColor, vAlpha * core);',
     '}'
   ].join('\n');
+
+  // Continuous synapses join neuron dots; round particles carry transient activity.
+  function linkMaterial(size, opacity, lines) {
+    return new global.THREE.ShaderMaterial({
+      uniforms: { uLight: { value: 0 }, uDpr: { value: 1 }, uSize: { value: size }, uOpacity: { value: opacity } },
+      vertexShader: [
+        'attribute vec3 color; uniform float uLight; uniform float uDpr; uniform float uSize; uniform float uOpacity;',
+        'varying vec3 vColor; varying float vAlpha;',
+        'void main() {',
+        'float strength = max(color.r, max(color.g, color.b));',
+        'vColor = color / max(strength, 0.001) * (1.0 - 0.55 * uLight);',
+        'vAlpha = uOpacity * strength;',
+        'gl_PointSize = uSize * uDpr;',
+        'gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+        '}'
+      ].join('\n'),
+      fragmentShader: lines ? 'varying vec3 vColor; varying float vAlpha; void main() { gl_FragColor = vec4(vColor, vAlpha); }' : FRAG,
+      transparent: true, depthWrite: false, blending: global.THREE.NormalBlending
+    });
+  }
 
   function FlyBrain(container, opts) {
     this.el = container;
@@ -107,6 +128,7 @@
       autoRotate: true, rotateSpeed: 0.0016, distance: 2.35, fov: 50,
       interactive: true, onHover: null, edges: true, pixelRatioCap: 2, rest: 0.34, scale: 'standard', onSlow: null
     }, opts || {});
+    if (global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches) this.opts.autoRotate = false;
     this.timers = [];
     this.disposed = false;
     this.visible = true;
@@ -159,8 +181,16 @@
     this.renderer.setClearColor(0x000000, 0);
     this.el.innerHTML = '';
     this.el.appendChild(this.renderer.domElement);
+    this.renderer.domElement.setAttribute('role', 'img');
+    this.renderer.domElement.setAttribute('aria-label', '3D neuron cloud with real synaptic connectivity. Drag to rotate; scroll to zoom.');
+    var layoutNote = document.createElement('span');
+    layoutNote.className = 'brain-layout-note';
+    layoutNote.textContent = '3D connectome · drag to explore';
+    this.el.appendChild(layoutNote);
     this.group = new T.Group();
-    this.group.rotation.set(0.15, 0.5, 0);
+    this.group.rotation.set(0.35, 0.85, 0);
+    this.rotationAnchorY = 0.85;
+    this.rotationPhase = 0;
     this.scene.add(this.group);
 
     this.level = new Float32Array(n);
@@ -183,7 +213,7 @@
     geo.setAttribute('aLevel', this.aLevel);
     geo.setAttribute('aFlash', this.aFlash);
     geo.setAttribute('aSize', new T.BufferAttribute(size, 1));
-    this.uniforms = { uScale: { value: 400 }, uRest: { value: o.rest } };
+    this.uniforms = { uScale: { value: 400 }, uRest: { value: o.rest }, uLight: { value: 0 }, uDpr: { value: this.renderer.getPixelRatio() } };
     var mat = new T.ShaderMaterial({
       uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG,
       transparent: true, depthWrite: false, blending: T.AdditiveBlending
@@ -216,14 +246,17 @@
 
   FlyBrain.prototype.applyTheme = function () {
     var T = global.THREE, light = document.documentElement.dataset.theme === "light";
+    var dpr = this.renderer.getPixelRatio();
     this.group.traverse(function (object) {
       if (!object.material) return;
-      object.material.blending = light ? T.NormalBlending : T.AdditiveBlending;
+      object.material.blending = T.NormalBlending;
+      if (object.material.uniforms) {
+        object.material.uniforms.uLight.value = light ? 1 : 0;
+        object.material.uniforms.uDpr.value = dpr;
+      }
       object.material.needsUpdate = true;
     });
-    this.uniforms.uRest.value = light ? Math.max(0.55, this.opts.rest) : this.opts.rest;
-    if (this.baseEdges) this.baseEdges.material.opacity = light ? 0.12 : 0.032;
-    this.focusLines.material.color.set(light ? 0x33234d : 0xffffff);
+    this.uniforms.uRest.value = light ? 0.62 : 0.52;
     this.dirty = true;
   };
 
@@ -235,29 +268,31 @@
       var cb = (d.role[d.src[b]] ? 1000 : 0) + (d.role[d.dst[b]] ? 1000 : 0) + d.w[b];
       return cb - ca;
     });
-    var budget = this.opts.scale === 'full' ? (FlyBrain.weakDevice() ? 5000 : 12000) : 8000;
-    var keep = Math.min(idx.length, budget), pos = new Float32Array(keep * 6), col = new Float32Array(keep * 6);
+    var keep = Math.min(idx.length, this.opts.scale === 'full' ? 160 : 100);
+    var pos = new Float32Array(keep * LINK_VERTICES * 3), col = new Float32Array(pos.length);
     for (var k = 0; k < keep; k++) {
-      var s = d.src[idx[k]], t = d.dst[idx[k]], cs = ROLE_RGB[ROLE_NAMES[d.role[s]]], ct = ROLE_RGB[ROLE_NAMES[d.role[t]]];
-      for (var j = 0; j < 3; j++) {
-        pos[k * 6 + j] = d.pos[s * 3 + j]; pos[k * 6 + 3 + j] = d.pos[t * 3 + j];
-        col[k * 6 + j] = cs[j] * 0.5; col[k * 6 + 3 + j] = ct[j] * 0.5;
+      var source = d.src[idx[k]], target = d.dst[idx[k]], color = ROLE_RGB[ROLE_NAMES[d.role[target]]];
+      for (var dot = 0; dot < LINK_VERTICES; dot++) {
+        var t = dot / (LINK_VERTICES - 1);
+        for (var j = 0; j < 3; j++) {
+          var offset = (k * LINK_VERTICES + dot) * 3 + j;
+          pos[offset] = d.pos[source * 3 + j] * (1 - t) + d.pos[target * 3 + j] * t;
+          col[offset] = color[j];
+        }
       }
     }
     var g = new T.BufferGeometry();
     g.setAttribute('position', new T.BufferAttribute(pos, 3));
     g.setAttribute('color', new T.BufferAttribute(col, 3));
-    this.baseEdges = new T.LineSegments(g, new T.LineBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.032, blending: T.AdditiveBlending, depthWrite: false
-    }));
+    this.baseEdges = new T.LineSegments(g, linkMaterial(1, 0.28, true));
     this.baseEdges.frustumCulled = false;
     this.group.add(this.baseEdges);
   };
 
   FlyBrain.prototype._buildActiveLayer = function () {
     var T = global.THREE;
-    this.actPos = new Float32Array(MAX_ACTIVE * 6);
-    this.actCol = new Float32Array(MAX_ACTIVE * 6);
+    this.actPos = new Float32Array(MAX_ACTIVE * LINK_VERTICES * 3);
+    this.actCol = new Float32Array(MAX_ACTIVE * LINK_VERTICES * 3);
     this.actLife = new Float32Array(MAX_ACTIVE);
     this.actRGB = new Float32Array(MAX_ACTIVE * 3);
     this.actHead = 0;
@@ -266,29 +301,27 @@
     this.actColAttr = new T.BufferAttribute(this.actCol, 3).setUsage(T.DynamicDrawUsage);
     g.setAttribute('position', this.actPosAttr);
     g.setAttribute('color', this.actColAttr);
-    this.actLines = new T.LineSegments(g, new T.LineBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false
-    }));
+    this.actLines = new T.LineSegments(g, linkMaterial(1, 0.75, true));
     this.actLines.frustumCulled = false;
     this.group.add(this.actLines);
   };
 
   FlyBrain.prototype._buildFocusEdges = function () {
     var T = global.THREE, g = new T.BufferGeometry();
-    this.focusPos = new Float32Array(MAX_ACTIVE * 6);
+    this.focusPos = new Float32Array(MAX_ACTIVE * LINK_VERTICES * 3);
     this.focusAttr = new T.BufferAttribute(this.focusPos, 3).setUsage(T.DynamicDrawUsage);
     g.setAttribute('position', this.focusAttr);
     g.setDrawRange(0, 0);
-    this.focusLines = new T.LineSegments(g, new T.LineBasicMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.55, blending: T.AdditiveBlending, depthWrite: false
-    }));
+    this.focusColors = new T.BufferAttribute(new Float32Array(this.focusPos.length), 3).setUsage(T.DynamicDrawUsage);
+    g.setAttribute('color', this.focusColors);
+    this.focusLines = new T.LineSegments(g, linkMaterial(1, 0.85, true));
     this.focusLines.frustumCulled = false;
     this.group.add(this.focusLines);
   };
 
   FlyBrain.prototype._buildPulses = function () {
     var T = global.THREE, g = new T.BufferGeometry();
-    this.pPos = new Float32Array(MAX_PULSES * 3);
+    this.pPos = new Float32Array(MAX_PULSES * 3).fill(9999);
     this.pCol = new Float32Array(MAX_PULSES * 3);
     this.pT = new Float32Array(MAX_PULSES).fill(2);
     this.pSpeed = new Float32Array(MAX_PULSES);
@@ -299,10 +332,7 @@
     this.pColAttr = new T.BufferAttribute(this.pCol, 3).setUsage(T.DynamicDrawUsage);
     g.setAttribute('position', this.pPosAttr);
     g.setAttribute('color', this.pColAttr);
-    this.pulses = new T.Points(g, new T.PointsMaterial({
-      size: 0.03, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95,
-      blending: T.AdditiveBlending, depthWrite: false
-    }));
+    this.pulses = new T.Points(g, linkMaterial(3.2, 0.95));
     this.pulses.frustumCulled = false;
     this.group.add(this.pulses);
   };
@@ -357,6 +387,7 @@
           self.group.rotation.x = Math.max(-1.3, Math.min(1.3, self.group.rotation.x + (e.clientY - p.y) * 0.008));
         }
         p.x = e.clientX; p.y = e.clientY;
+        self.rotationAnchorY = self.group.rotation.y; self.rotationPhase = 0;
         self.lastInteract = performance.now();
         self.dirty = true;
       } else if (self.opts.onHover) {
@@ -430,7 +461,7 @@
       if (acts[k] > this.flash[cells[k]]) this.flash[cells[k]] = acts[k];
     }
     var maxPulses = (opts && opts.pulses) || 42;
-    for (k = 0; k < edges.length; k++) {
+    for (k = 0; k < Math.min(edges.length, MAX_ACTIVE); k++) {
       this._addActiveEdge(edges[k]);
       if (k < maxPulses) this._spawnPulse(edges[k]);
     }
@@ -441,10 +472,12 @@
     var d = this.data, s = d.src[e], t = d.dst[e], h = this.actHead, j;
     this.actHead = (h + 1) % MAX_ACTIVE;
     var c = ROLE_RGB[ROLE_NAMES[d.role[t]]];
-    for (j = 0; j < 3; j++) {
-      this.actPos[h * 6 + j] = d.pos[s * 3 + j];
-      this.actPos[h * 6 + 3 + j] = d.pos[t * 3 + j];
-      this.actRGB[h * 3 + j] = c[j];
+    for (var dot = 0; dot < LINK_VERTICES; dot++) {
+      var fraction = dot / (LINK_VERTICES - 1);
+      for (j = 0; j < 3; j++) {
+        this.actPos[(h * LINK_VERTICES + dot) * 3 + j] = d.pos[s * 3 + j] * (1 - fraction) + d.pos[t * 3 + j] * fraction;
+        this.actRGB[h * 3 + j] = c[j];
+      }
     }
     this.actLife[h] = 1;
     this.actPosAttr.needsUpdate = true;
@@ -520,28 +553,36 @@
   FlyBrain.prototype.focusEdges = function (edgeIdx, hex) {
     if (!this.focusLines) return;
     var d = this.data, n = Math.min(edgeIdx.length, MAX_ACTIVE), j, T = global.THREE;
+    var color = new T.Color(hex || '#00b8a6');
     for (var k = 0; k < n; k++) {
       var s = d.src[edgeIdx[k]], t = d.dst[edgeIdx[k]];
-      for (j = 0; j < 3; j++) {
-        this.focusPos[k * 6 + j] = d.pos[s * 3 + j];
-        this.focusPos[k * 6 + 3 + j] = d.pos[t * 3 + j];
+      for (var dot = 0; dot < LINK_VERTICES; dot++) {
+        var fraction = dot / (LINK_VERTICES - 1), offset = (k * LINK_VERTICES + dot) * 3;
+        for (j = 0; j < 3; j++) this.focusPos[offset + j] = d.pos[s * 3 + j] * (1 - fraction) + d.pos[t * 3 + j] * fraction;
+        this.focusColors.setXYZ(k * LINK_VERTICES + dot, color.r, color.g, color.b);
       }
     }
     this.focusAttr.needsUpdate = true;
-    this.focusLines.geometry.setDrawRange(0, n * 2);
-    this.focusLines.material.color = new T.Color(hex || '#ffffff');
+    this.focusColors.needsUpdate = true;
+    this.focusLines.geometry.setDrawRange(0, n * LINK_VERTICES);
     this.dirty = true;
   };
 
   FlyBrain.prototype.setView = function (name) {
     var r = { iso: [0.15, 0.5], top: [1.25, 0], side: [0, 1.5708], front: [0, 0] }[name] || [0.15, 0.5];
     this.group.rotation.set(r[0], r[1], 0);
+    this.rotationAnchorY = r[1]; this.rotationPhase = 0;
     this.dirty = true;
   };
 
   FlyBrain.prototype.reset = function () {
     this.timers.forEach(clearTimeout); this.timers = [];
-    if (this.flash) { this.flash.fill(0); this.target.fill(0); this.level.fill(0); this.actLife.fill(0); this.pT.fill(2); }
+    if (this.flash) {
+      this.flash.fill(0); this.target.fill(0); this.level.fill(0); this.actLife.fill(0); this.pT.fill(2);
+      this.actCol.fill(0); this.actColAttr.needsUpdate = true;
+      this.pPos.fill(9999); this.pPosAttr.needsUpdate = true;
+      this.focusLines.geometry.setDrawRange(0, 0);
+    }
     this.dirty = true;
   };
 
@@ -568,7 +609,8 @@
     var i, anim = false, n = this.data.n, lvl = this.level, tgt = this.target, fl = this.flash;
 
     if (this.opts.autoRotate && performance.now() - this.lastInteract > 2500) {
-      this.group.rotation.y += this.opts.rotateSpeed;
+      this.rotationPhase += this.opts.rotateSpeed;
+      this.group.rotation.y = this.rotationAnchorY + Math.sin(this.rotationPhase) * 0.5;
       anim = true;
     }
     for (i = 0; i < n; i++) {
@@ -583,13 +625,12 @@
       var life = this.actLife[m];
       if (life > 0.02) {
         life *= 0.945; this.actLife[m] = life; activeAny = true;
-        for (i = 0; i < 3; i++) {
-          this.actCol[m * 6 + i] = this.actRGB[m * 3 + i] * life;
-          this.actCol[m * 6 + 3 + i] = this.actRGB[m * 3 + i] * life;
+        for (var dot = 0; dot < LINK_VERTICES; dot++) {
+          for (i = 0; i < 3; i++) this.actCol[(m * LINK_VERTICES + dot) * 3 + i] = this.actRGB[m * 3 + i] * life;
         }
       } else if (life !== 0) {
         this.actLife[m] = 0;
-        for (i = 0; i < 6; i++) this.actCol[m * 6 + i] = 0;
+        for (i = 0; i < LINK_VERTICES * 3; i++) this.actCol[m * LINK_VERTICES * 3 + i] = 0;
         activeAny = true;
       }
     }

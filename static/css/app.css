@@ -660,3 +660,10 @@ a.mode-btn { text-decoration: none; }
   .chat-body .topbar .actions { grid-row: 2; justify-content: flex-start; }
   .chat-body .topbar .who { grid-row: 3; }
 }
+
+/* Dot-matrix brain: a quiet canvas in either theme. */
+.brain-wrap { background: radial-gradient(ellipse at center, #152035 0%, #0b1020 80%); }
+:root[data-theme="light"] .brain-wrap { background: radial-gradient(ellipse at center, #ffffff 0%, #f0f4f8 80%); }
+.brain-layout-note { position: absolute; top: 2.2rem; left: 0.7rem; color: var(--text-3); font: 0.62rem var(--font-mono); pointer-events: none; }
+.bg-brain .brain-layout-note { display: none; }
+.lab-wrap .brain-layout-note { top: 0.7rem; left: 50%; transform: translateX(-50%); white-space: nowrap; }

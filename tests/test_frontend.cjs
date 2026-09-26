@@ -37,3 +37,40 @@ for (const scale of ['standard', 'full']) {
     }
   });
 }
+
+for (const scale of ['standard', 'full']) {
+  test(`${scale}: 3D layout preserves neuron positions and real connections`, async () => {
+    const data = await window.FlyBrain.load(scale);
+    const raw = JSON.parse(fs.readFileSync(path.join(root, 'static', scale === 'full' ? 'connectome_full.json' : 'connectome.json')));
+    assert.deepEqual(Array.from(data.ids), raw.cells.id);
+    assert.deepEqual(Array.from(data.src), raw.edges.src);
+    assert.deepEqual(Array.from(data.dst), raw.edges.dst);
+    const positions = new Set();
+    for (let i = 0; i < data.n; i++) {
+      const p = Array.from(data.pos.slice(i * 3, i * 3 + 3));
+      assert.ok(p.every(Number.isFinite));
+      positions.add(p.join(','));
+    }
+    for (let i = 3; i < data.pos.length; i++) {
+      assert.ok(Math.abs((data.pos[i] - data.pos[i % 3]) - (raw.cells.pos[i] - raw.cells.pos[i % 3])) < 1e-6, 'relative anatomical positions must be preserved');
+    }
+    const view = {data, group:new THREE.Group()};
+    const proto = window.FlyBrain.prototype;
+    proto._buildActiveLayer.call(view);
+    proto._buildFocusEdges.call(view);
+    proto._buildPulses.call(view);
+    proto._addActiveEdge.call(view, 0);
+    proto.focusEdges.call(view, [0], '#00b8a6');
+    assert.ok(view.actLines.isLineSegments && view.focusLines.isLineSegments && view.pulses.isPoints);
+    assert.equal(view.focusLines.geometry.drawRange.count, 2);
+    const source = data.src[0], target = data.dst[0];
+    for (let j = 0; j < 3; j++) {
+      const expected = data.pos[source * 3 + j];
+      assert.ok(Math.abs(view.actPos[j] - expected) < 1e-6, 'connection must start at its source neuron');
+      assert.ok(Math.abs(view.focusPos[j] - expected) < 1e-6);
+      assert.equal(view.actPos[3 + j], data.pos[target * 3 + j]);
+      assert.equal(view.focusPos[3 + j], data.pos[target * 3 + j]);
+    }
+    assert.ok(view.pPos.every(x => x === 9999), 'inactive pulses must not pile up at the origin');
+  });
+}

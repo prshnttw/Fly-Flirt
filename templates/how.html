@@ -7,7 +7,7 @@
   <p>Two people chat. An AI reads each message and turns it into seven numbers. Those numbers drive real neurons in a fruit fly's brain, and the activity spreads through the fly's real synapses. You watch it happen in 3D, and at the end you get a verdict that says <em>which of your messages caused which neurons and connections to fire</em>.</p>
 
   <h2>The connectome is real</h2>
-  <p>The wiring diagram comes from the <strong>MaleCNS v1.0</strong> connectome (Janelia FlyEM), the complete map of a male fruit fly's central nervous system: about 166,000 neurons. We use a <strong>{{ "{:,}".format(summary.cells) }}-cell subgraph</strong> with <strong>{{ "{:,}".format(summary.edges) }} real synaptic connections</strong>, built around the <code>pC1</code> courtship hub (the cells that keep a male fly in a courtship state) and its strongest real partners. Each cell's position, neurotransmitter prediction and synapse counts are real data.</p>
+  <p>The wiring diagram comes from the <strong>MaleCNS v1.0</strong> connectome (Janelia FlyEM), the complete map of a male fruit fly's central nervous system: about 166,000 neurons. We use a <strong>{{ "{:,}".format(summary.cells) }}-cell subgraph</strong> with <strong>{{ "{:,}".format(summary.edges) }} real synaptic connections</strong>, built around the <code>pC1</code> courtship hub (the cells that keep a male fly in a courtship state) and its strongest real partners. Neuron identities, neurotransmitter predictions and synaptic connections come from the dataset. The 3D view preserves the relative neuron positions from the dataset. Thin links show a selection of real connections, while travelling dots show simulated activity.</p>
   <table>
     <thead><tr><th>Role</th><th>Cells in our subgraph</th></tr></thead>
     <tbody>
@@ -38,7 +38,7 @@
     <li>No accounts. We set one random session cookie so the server knows which chat is yours.</li>
     <li>Your messages are sent to an AI provider (Groq) for analysis. Don't share personal or sensitive information.</li>
     <li>Messages and their analysis are stored for {{ retention_days }} days so verdicts and reconnects work, then deleted.</li>
-    <li>Only the two people in a chat can see it. The shareable card contains numbers and anatomy only, never message text.</li>
+    <li>Only the two people in a chat can see it. The shareable card contains numbers and a schematic neuron map only, never message text.</li>
     <li>You can leave a chat at any time, and report a conversation from your verdict page.</li>
   </ul>
   <p><a class="btn btn-primary" href="{{ url_for('pages.landing') }}">Start a chat</a></p>
