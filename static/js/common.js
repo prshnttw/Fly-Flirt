@@ -12,6 +12,33 @@
     try { return node ? JSON.parse(node.textContent) : {}; } catch (e) { return {}; }
   };
 
+  /* A random nickname: one emoji (matches the server's allow-list in flyflirt/util.py) plus an
+     adjective/noun pair, always short enough for the field (max combo below is 20 chars, field is 24). */
+  var NICK_EMOJI = ['🦋', '🐝', '🦗', '🐛', '🦟', '🐞', '✨', '🌙', '🔥', '💫', '🌟', '🐜'];
+  var NICK_ADJ = ['Curious', 'Velvet', 'Sneaky', 'Electric', 'Midnight', 'Golden', 'Quiet', 'Bold',
+    'Lucky', 'Gentle', 'Restless', 'Cosmic', 'Dizzy', 'Fuzzy', 'Plucky', 'Nimble', 'Cheeky', 'Wild'];
+  var NICK_NOUN = ['Firefly', 'Moth', 'Beetle', 'Cricket', 'Dragonfly', 'Comet', 'Nebula', 'Wasp',
+    'Cicada', 'Lantern', 'Ember', 'Drift', 'Sprite', 'Pixel', 'Glowworm', 'Hornet'];
+  function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+  FF.randomNickname = function () {
+    return pick(NICK_EMOJI) + ' ' + pick(NICK_ADJ) + ' ' + pick(NICK_NOUN);
+  };
+  /* Fill a nickname field with a random name, wire an optional dice button to reroll it, and make the
+     default easy to throw away: the first time the field is focused, select it all so typing replaces
+     it outright instead of needing a row of backspaces. */
+  FF.wireNickname = function (input, diceBtn) {
+    if (!input) return;
+    if (!input.value.trim()) input.value = FF.randomNickname();
+    input.addEventListener('focus', function () { input.select(); }, { once: true });
+    if (diceBtn) diceBtn.addEventListener('click', function () { input.value = FF.randomNickname(); input.focus(); input.select(); });
+  };
+  /* A nickname is required everywhere: validate before letting a flow proceed. */
+  FF.requireNickname = function (input) {
+    var v = input.value.trim();
+    if (!v) { input.focus(); FF.toast('Please enter a nickname first.', 'warn'); return null; }
+    return v;
+  };
+
   /* Build DOM safely: text is always set via textContent, never innerHTML. */
   FF.el = function (tag, attrs) {
     var node = document.createElement(tag), i, child;

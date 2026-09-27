@@ -37,7 +37,7 @@
   <ul>
     <li>No accounts. We set one random session cookie so the server knows which chat is yours.</li>
     <li>Your messages are sent to an AI provider (Groq) for analysis. Don't share personal or sensitive information.</li>
-    <li>Messages and their analysis are stored for {{ retention_days }} days so verdicts and reconnects work, then deleted.</li>
+    <li><strong>Your words are never written to our server's disk.</strong> While a chat is live, the server keeps it in memory so both of you can see the conversation; once it's saved, only the numbers derived from each message (its 7 parameters, and which neurons and synapses fired) are stored, for {{ retention_days }} days so your verdict keeps working. If the server restarts mid-chat, the neural activity and verdict survive exactly, but the transcript itself does not.</li>
     <li>Only the two people in a chat can see it. The shareable card contains numbers and a schematic neuron map only, never message text.</li>
     <li>You can leave a chat at any time, and report a conversation from your verdict page.</li>
   </ul>

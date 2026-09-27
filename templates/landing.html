@@ -23,8 +23,9 @@
     {% endif %}
 
     <div class="nick-row">
-      <label class="sr-only" for="nick">Nickname (optional)</label>
-      <input class="input" id="nick" maxlength="18" placeholder="Nickname (optional)" autocomplete="nickname">
+      <label class="sr-only" for="nick">Nickname</label>
+      <input class="input" id="nick" maxlength="24" placeholder="Nickname" autocomplete="nickname" required>
+      <button class="btn btn-ghost dice-btn" id="nick-dice" type="button" title="Random nickname" aria-label="Generate a random nickname">🎲</button>
     </div>
 
     <div id="home-step" class="wizard">

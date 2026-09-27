@@ -19,17 +19,24 @@
     });
   }
 
+  // Nickname is required everywhere: pre-fill a random one so it's never actually empty, and offer a reroll.
+  var nickInput = FF.$('#nick');
+  FF.wireNickname(nickInput, FF.$('#nick-dice'));
+
   // "Enter chat": ask who you are, then who you'd like to meet, then start scanning.
   var steps = ['home-step', 'gender-step', 'seek-step'], picked = { gender: null };
   function show(id) { steps.forEach(function (s) { FF.$('#' + s).hidden = s !== id; }); }
-  function nick() { return FF.$('#nick').value.trim(); }
   function start(gender, seeking) {
-    window.location.href = '/match?mode=' + gender + '&seeking=' + seeking + (nick() ? '&nick=' + encodeURIComponent(nick()) : '');
+    var nick = FF.requireNickname(nickInput);
+    if (!nick) return;
+    window.location.href = '/match?mode=' + gender + '&seeking=' + seeking + '&nick=' + encodeURIComponent(nick);
   }
   FF.$('#go-enter').addEventListener('click', function () { show('gender-step'); });
   FF.$('#go-invite').addEventListener('click', function (e) {
     e.preventDefault();
-    window.location.href = '/invite' + (nick() ? '?nick=' + encodeURIComponent(nick()) : '');
+    var nick = FF.requireNickname(nickInput);
+    if (!nick) return;
+    window.location.href = '/invite?nick=' + encodeURIComponent(nick);
   });
   FF.$$('[data-gender]').forEach(function (b) {
     b.addEventListener('click', function () {

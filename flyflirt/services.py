@@ -61,6 +61,13 @@ class Services:
             return dataclasses.replace(self.engine_cfg, meter_scale=self.config.SIM_METER_SCALE_FULL)
         return self.engine_cfg
 
+    # -- privacy: does *this server* keep message text unless a room opts out/in? ------------
+    @property
+    def retain_text_default(self) -> bool:
+        if self.config.RETAIN_MESSAGE_TEXT is not None:
+            return self.config.RETAIN_MESSAGE_TEXT   # explicitly set (RETAIN_MESSAGE_TEXT env var)
+        return self.config.ENV != "production"        # otherwise: keep text locally, not in a real deployment
+
     def stats(self) -> dict:
         room_stats = self.rooms.stats()
         waiting = self.matchmaker.counts()
@@ -77,7 +84,8 @@ class Services:
 
 def build_services(config) -> Services:
     db_path = getattr(config, "DB_PATH", None) or os.path.join(config.DATA_DIR, "flyflirt.db")
-    storage = Storage(db_path)
+    retain_text_default = config.RETAIN_MESSAGE_TEXT if config.RETAIN_MESSAGE_TEXT is not None else config.ENV != "production"
+    storage = Storage(db_path, retain_text=retain_text_default)
     connectome = load_connectome(config.CONNECTOME_PATH)
     engine_cfg = EngineConfig.from_config(config)
     router = build_router(config, usage_store=storage)

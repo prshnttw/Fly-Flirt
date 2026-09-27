@@ -7,6 +7,7 @@ import time
 import numpy as np
 
 from .narrate import CHANNEL_INFO, CHANNEL_LEGEND
+from .rooms import TEXT_NOT_RETAINED
 
 DISCLAIMER = (
     "This is a fruit-fly courtship cartoon sitting on your chat stats. It is not destiny. "
@@ -104,7 +105,7 @@ def build_verdict(room, conn, ecfg) -> dict:
         messages.append({
             "index": m, "seq": msg.seq, "slot": msg.slot,
             "nickname": who.nickname if who else "?", "label": who.label if who else "?",
-            "text": msg.text, "params": msg.params, "topic": msg.topic, "meter": trace.meter,
+            "text": msg.text or TEXT_NOT_RETAINED, "params": msg.params, "topic": msg.topic, "meter": trace.meter,
             "channels": [{"channel": k, "strength": round(v, 2), "population": CHANNEL_INFO[k][1]} for k, v in channels[:3]],
             "share": round(float(acc[m, cell_on].sum()) / on_total, 4),
             "recruited_cells": trace.new_cells, "recruited_edges": trace.new_edges,

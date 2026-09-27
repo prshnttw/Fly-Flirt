@@ -1,4 +1,6 @@
 """Abuse controls: message filter, blocks, skips, strikes/bans, report handling."""
+import base64
+import re
 import unittest
 
 from flyflirt.moderation import RepeatGuard, check_message
@@ -164,6 +166,71 @@ class SafetyFlowTests(unittest.TestCase):
         solo.emit("invite_create", {"mode": "friends"})
         room_id = solo.wait("invite_created")["room_id"]
         self.assertEqual(solo.http.post(f"/api/rooms/{room_id}/report", json={}).status_code, 409)
+
+
+class AdminPageTests(unittest.TestCase):
+    def basic_auth(self, user, password):
+        token = base64.b64encode(f"{user}:{password}".encode()).decode()
+        return {"Authorization": f"Basic {token}"}
+
+    def test_admin_is_invisible_unless_both_credentials_are_configured(self):
+        for overrides in ({}, {"ADMIN_USERNAME": "admin"}, {"ADMIN_PASSWORD": "secret"}):
+            app = make_app(**overrides)
+            c = app.test_client()
+            self.assertEqual(c.get("/admin/").status_code, 404)
+            self.assertEqual(c.get("/admin/", headers=self.basic_auth("admin", "secret")).status_code, 404)
+
+    def test_admin_requires_correct_credentials(self):
+        app = make_app(ADMIN_USERNAME="admin", ADMIN_PASSWORD="hunter2")
+        c = app.test_client()
+        r = c.get("/admin/")
+        self.assertEqual(r.status_code, 401)
+        self.assertIn("Basic", r.headers.get("WWW-Authenticate", ""))
+        self.assertEqual(c.get("/admin/", headers=self.basic_auth("admin", "wrong")).status_code, 401)
+        self.assertEqual(c.get("/admin/", headers=self.basic_auth("nope", "hunter2")).status_code, 401)
+        ok = c.get("/admin/", headers=self.basic_auth("admin", "hunter2"))
+        self.assertEqual(ok.status_code, 200)
+        self.assertIn(b"Unresolved reports", ok.data)
+
+    def test_admin_can_review_reports_and_manage_bans(self):
+        app = make_app(ADMIN_USERNAME="admin", ADMIN_PASSWORD="hunter2")
+        svc = app.extensions["flyflirt"]
+        a, b, room_id, _, _ = pair_up(app, "friends", "friends")
+        enter_room(a, room_id)
+        enter_room(b, room_id)
+        a.http.post(f"/api/rooms/{room_id}/report", json={"category": "spam", "reason": "annoying"})
+        reported = svc.rooms.get(room_id).participant(1).client_id
+        auth = self.basic_auth("admin", "hunter2")
+        c = app.test_client()
+
+        page = c.get("/admin/", headers=auth)
+        self.assertIn(b"annoying", page.data)
+        csrf = re.search(rb'name="csrf" value="([^"]+)"', page.data).group(1).decode()
+        report_id = svc.storage.list_reports(resolved=False)[0]["id"]
+
+        # can't act without the token, or with someone else's session
+        self.assertEqual(c.post(f"/admin/reports/{report_id}/resolve", data={}, headers=auth).status_code, 400)
+        outsider = app.test_client()
+        self.assertEqual(outsider.post(f"/admin/reports/{report_id}/resolve", data={"csrf": csrf}, headers=auth).status_code, 400)
+
+        r = c.post(f"/admin/reports/{report_id}/resolve", data={"csrf": csrf}, headers=auth)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(svc.storage.list_reports(resolved=False), [])
+        self.assertEqual(len(svc.storage.list_reports(resolved=True)), 1)
+
+        # ban the reported person, see them listed, then unban
+        c.post(f"/admin/bans/{reported}/extend", data={"csrf": csrf}, headers=auth)
+        self.assertGreater(svc.safety.banned_for(reported), 0)
+        page2 = c.get("/admin/", headers=auth)
+        self.assertIn(reported[:14].encode(), page2.data)
+        c.post(f"/admin/bans/{reported}/clear", data={"csrf": csrf}, headers=auth)
+        self.assertEqual(svc.safety.banned_for(reported), 0)
+
+    def test_admin_has_no_link_anywhere_public(self):
+        app = make_app(ADMIN_USERNAME="admin", ADMIN_PASSWORD="hunter2")
+        c = app.test_client()
+        for path in ("/", "/how", "/lab"):
+            self.assertNotIn(b"/admin", c.get(path).data)
 
 
 if __name__ == "__main__":

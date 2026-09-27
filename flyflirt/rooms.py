@@ -61,7 +61,7 @@ class RoomMessage:
         """Serialise for a client. The fly's reading of a message (parameters, diary, tip,
         narration, model used) is private to its author, and the reply tip is private to the recipient: pass ``viewer`` to enforce that."""
         out = {
-            "seq": self.seq, "slot": self.slot, "text": self.text, "ts": self.ts,
+            "seq": self.seq, "slot": self.slot, "text": self.text or TEXT_NOT_RETAINED, "ts": self.ts,
             "analysed": self.analysed, "params": self.params, "diary": self.diary, "tip": self.tip,
             "topic": self.topic, "provider": self.provider, "degraded": self.degraded,
             "meter": self.meter, "narration": self.narration, "counts": self.counts,
@@ -79,6 +79,9 @@ class RoomMessage:
 
 AUTHOR_ONLY = ("params", "topic", "provider", "degraded", "narration")   # the fly's reading of *your* message
 RECIPIENT_ONLY = ("tip",)                                                 # advice for whoever replies
+# A message's text is only ever empty here because it wasn't retained to disk (Config.RETAIN_MESSAGE_TEXT)
+# and the room was rebuilt from the database after a restart; a live, in-memory message always has its text.
+TEXT_NOT_RETAINED = "(message text was not stored on the server)"
 
 
 class Room:
@@ -98,9 +101,13 @@ class Room:
         self.queue: deque = deque()
         self.worker_running = False
         self.last_activity = created_at
+        self.last_message_at = created_at      # touched only by real chat messages, not joins/typing
         self.owner_sids: set[str] = set()
         self.ended_by: int | None = None
         self.compacted = False
+        self.store_override: bool | None = None   # None = follow the server default; True/False = this room's choice
+        self.seen: dict[int, int] = {}             # slot -> highest seq they've seen (in memory only, never persisted)
+        self.verdict_nudged_at: float | None = None  # when we last prompted "see your verdict?" for going quiet
 
     def slot_of(self, client_id: str) -> int | None:
         for p in self.participants:
@@ -133,6 +140,7 @@ class Room:
             "id": self.id, "mode": self.mode, "status": self.status, "code": self.code, "scale": self.scale,
             "participants": [p.public() for p in self.participants],
             "counts": self.counts(),
+            "store_override": self.store_override, "seen": dict(self.seen),
         }
 
 
@@ -314,6 +322,8 @@ class RoomManager:
             scale = "standard"                                   # full connectome not available any more
         room = Room(row["id"], row["code"], row["mode"], row["status"], row["created_at"], self._new_engine(scale),
                     row["share_token"], scale)
+        store_override = row.get("store_override")
+        room.store_override = None if store_override is None else bool(store_override)
         for p in data["participants"]:
             room.participants.append(Participant(p["slot"], p["client_id"], p["label"], p["nickname"]))
         for m in data["messages"]:
@@ -344,6 +354,16 @@ class RoomManager:
         return room
 
     # -- housekeeping ------------------------------------------------------------------
+    def rooms_gone_quiet(self, idle_s: float, min_messages: int, now: float | None = None) -> list[Room]:
+        """Active, verdict-ready rooms that have had no new message for ``idle_s`` and haven't already
+        been nudged this quiet spell (a fresh message clears the nudge flag, so this can fire again later
+        in the same conversation)."""
+        now = now or time.time()
+        with self._lock:
+            rooms = list(self._rooms.values())
+        return [r for r in rooms if r.status == "active" and r.verdict_nudged_at is None
+                and r.verdict_ready(min_messages) and now - r.last_message_at >= idle_s]
+
     def janitor(self, now: float | None = None) -> dict:
         now = now or time.time()
         cfg = self.config

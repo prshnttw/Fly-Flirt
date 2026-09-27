@@ -207,8 +207,9 @@ button { font-family: inherit; }
 }
 .title .slash { color: var(--cyan); -webkit-text-fill-color: var(--cyan); text-shadow: 0 0 22px rgba(0, 245, 212, 0.55); }
 .tagline { color: var(--text-2); font-size: 1.08rem; max-width: 470px; margin: 0 auto 1.6rem; }
-.nick-row { margin-bottom: 1.1rem; }
-.nick-row .input { text-align: center; }
+.nick-row { margin-bottom: 1.1rem; display: flex; gap: 0.5rem; }
+.nick-row .input { text-align: center; flex: 1; min-width: 0; }
+.dice-btn { flex: none; width: 2.6rem; padding: 0; font-size: 1.1rem; line-height: 1; }
 .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin-bottom: 1.2rem; }
 .mode-btn {
   --tone: var(--cyan);
@@ -293,6 +294,7 @@ button { font-family: inherit; }
 .bubble { padding: 0.75rem 1.05rem; border-radius: 16px; font-size: 0.95rem; line-height: 1.45; word-break: break-word; overflow-wrap: anywhere; white-space: pre-wrap; }
 .msg.mine .bubble { background: color-mix(in srgb, var(--tone) 88%, #000); color: #0d0914; font-weight: 500; border-bottom-right-radius: 4px; box-shadow: 0 4px 20px color-mix(in srgb, var(--tone) 28%, transparent); }
 .msg.mine.light .bubble { color: #fff; }
+.seen-mark { font-size: 0.66rem; color: var(--text-3); margin-top: 0.2rem; text-align: right; }
 .msg.theirs .bubble { background: var(--bg-elevated); border: 1px solid var(--border); border-left: 3px solid var(--tone); border-bottom-left-radius: 4px; }
 .chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.3rem; min-height: 1.15rem; }
 .msg.mine .chips { justify-content: flex-end; }
@@ -305,6 +307,8 @@ button { font-family: inherit; }
 .composer .input { flex: 1; }
 .composer .count { align-self: center; font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-3); min-width: 2.6rem; text-align: right; }
 .notice { margin-bottom: 0.7rem; padding: 0.6rem 0.9rem; border-radius: var(--r-md); font-size: 0.82rem; background: rgba(255, 183, 3, 0.08); border: 1px solid rgba(255, 183, 3, 0.35); }
+.nudge { margin-bottom: 0.7rem; padding: 0.6rem 0.9rem; border-radius: var(--r-md); font-size: 0.82rem; background: rgba(6, 214, 160, 0.08); border: 1px solid rgba(6, 214, 160, 0.35); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; animation: rise 0.25s var(--ease); }
+.nudge span:first-child { flex: 1; min-width: 140px; }
 
 .cockpit { display: flex; flex-direction: column; gap: 0.85rem; min-height: 0; overflow-y: auto; padding-right: 0.15rem; }
 .panel { padding: 1rem 1.1rem; }
@@ -611,9 +615,12 @@ a.mode-btn { text-decoration: none; }
 .chat-options > summary { list-style: none; }
 .chat-options > summary::-webkit-details-marker { display: none; }
 .chat-options[open] > summary { background: var(--surface-hover); border-color: var(--text-3); }
-.chat-options-list { position: absolute; z-index: 25; top: calc(100% + 0.5rem); right: 0; width: 220px; padding: 0.4rem; background: var(--bg-popover); }
+.chat-options-list { position: absolute; z-index: 25; top: calc(100% + 0.5rem); right: 0; width: 260px; padding: 0.4rem; background: var(--bg-popover); }
 .chat-options-list .btn { width: 100%; justify-content: flex-start; border-color: transparent; text-align: left; }
 .chat-options-list #block { color: var(--red); }
+.chat-options-list .privacy-row { padding: 0.55rem 0.7rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 0.3rem 0; }
+.chat-options-list .privacy-row .switch { font-weight: 600; }
+.chat-options-list .privacy-row p { font-size: 0.72rem; margin: 0.35rem 0 0; }
 .chat-body .msgs { padding: 0.35rem 0.25rem; gap: 1rem; scroll-behavior: auto; }
 .chat-body .bubble { font-size: 1rem; line-height: 1.55; }
 .chat-body .msg.mine .bubble { background: color-mix(in srgb, var(--tone) 14%, var(--bg-space)); color: var(--text); border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--border)); box-shadow: none; font-weight: 400; }

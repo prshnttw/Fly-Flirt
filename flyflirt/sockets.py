@@ -125,8 +125,11 @@ def register_socket_handlers(socketio, svc) -> None:
             return fail("rate_limited", "Too many attempts. Please wait a moment.")
         if ban_notice(client):
             return
+        nickname = clean_nickname(data.get("nickname"))
+        if not nickname:
+            return fail("nickname_required", "Please enter a nickname.")
         seeking = data.get("seeking") if data.get("seeking") in SEEKING else ""
-        ticket = Ticket(client, request.sid, clean_nickname(data.get("nickname")), mode, seeking=seeking)
+        ticket = Ticket(client, request.sid, nickname, mode, seeking=seeking)
         partner = svc.matchmaker.enqueue(ticket)
         if partner is not None:
             start_match(ticket, partner)
@@ -156,8 +159,11 @@ def register_socket_handlers(socketio, svc) -> None:
             return fail("rate_limited", "Too many attempts. Please wait a moment.")
         if ban_notice(client):
             return
+        nickname = clean_nickname(data.get("nickname"))
+        if not nickname:
+            return fail("nickname_required", "Please enter a nickname.")
         mode = data.get("mode") if data.get("mode") in PAIRS else "friends"
-        room = ensure_invite(client, mode, clean_nickname(data.get("nickname")), request.sid)
+        room = ensure_invite(client, mode, nickname, request.sid)
         emit("invite_created", invite_payload(room))
 
     @socketio.on("invite_join")
@@ -176,7 +182,10 @@ def register_socket_handlers(socketio, svc) -> None:
         target = svc.rooms.peek_code(code)
         if target is not None and target.participants and svc.safety.blocked_between(target.participants[0].client_id, client):
             return emit("invite_error", {"reason": "not_found"})      # a blocked pair just sees "expired"
-        room, error = svc.rooms.join_by_code(code, client, clean_nickname(data.get("nickname")))
+        nickname = clean_nickname(data.get("nickname"))
+        if not nickname:
+            return fail("nickname_required", "Please enter a nickname.")
+        room, error = svc.rooms.join_by_code(code, client, nickname)
         if room is None:
             return emit("invite_error", {"reason": error})
         owner = room.participants[0]
@@ -232,6 +241,7 @@ def register_socket_handlers(socketio, svc) -> None:
             "verdict_ready": room.verdict_ready(cfg.MIN_MESSAGES_FOR_VERDICT),
             "min_for_verdict": cfg.MIN_MESSAGES_FOR_VERDICT,
             "max_len": cfg.MAX_MESSAGE_LEN,
+            "retain_text_default": svc.retain_text_default,
         })
         socketio.emit("presence", presence(room), to=room.id)
 
@@ -242,6 +252,25 @@ def register_socket_handlers(socketio, svc) -> None:
         if room is None:
             return
         emit("typing", {"slot": slot, "on": bool(data.get("on"))}, to=room.id, include_self=False)
+
+    @socketio.on("seen")
+    def on_seen(data=None):
+        """Delivery receipts: purely in-memory, never written to disk, gone the moment the process
+        restarts or the room ends — that's the point, it's a live-chat nicety, not a record."""
+        data = data if isinstance(data, dict) else {}
+        room, slot = load_member(data.get("room_id"))
+        if room is None:
+            return
+        try:
+            seq = int(data.get("seq"))
+        except (TypeError, ValueError):
+            return
+        if seq < 0 or seq >= len(room.messages):
+            return
+        if room.seen.get(slot, -1) >= seq:
+            return   # already at least this far; nothing changed
+        room.seen[slot] = seq
+        socketio.emit("seen", {"slot": slot, "seq": seq}, to=room.id, include_self=False)
 
     @socketio.on("leave_room")
     def on_leave_room(data=None):
@@ -303,6 +332,23 @@ def register_socket_handlers(socketio, svc) -> None:
             socketio.emit("scale_changed", {"scale": scale}, to=room.id)
         emit("scale_working", {"scale": scale})
         socketio.start_background_task(switch)
+
+    @socketio.on("set_privacy")
+    def on_set_privacy(data=None):
+        """Either person can choose whether *this* chat's messages get written to the server's disk,
+        overriding the server-wide default for this room only. Never retroactive: it only changes what
+        happens to messages sent after the change."""
+        data = data if isinstance(data, dict) else {}
+        room, slot = load_member(data.get("room_id"))
+        if room is None:
+            return
+        want = data.get("store")   # true = save, false = don't save, null = go back to the server default
+        if want is not None and not isinstance(want, bool):
+            return fail("bad_privacy", "Unknown privacy setting.")
+        room.store_override = want
+        svc.storage.set_store_override(room.id, want)
+        effective = svc.retain_text_default if want is None else want
+        socketio.emit("privacy_changed", {"store_override": want, "effective": effective}, to=room.id)
 
     @socketio.on("lab_subscribe")
     def on_lab_subscribe(data=None):
@@ -390,7 +436,9 @@ def register_socket_handlers(socketio, svc) -> None:
             counts = room.counts()
             ready = room.verdict_ready(cfg.MIN_MESSAGES_FOR_VERDICT)
             room.touch()
-        svc.storage.add_message(room.id, msg)
+            room.last_message_at = time.time()
+            room.verdict_nudged_at = None   # a fresh message means the conversation isn't quiet any more
+        svc.storage.add_message(room.id, msg, retain_text=room.store_override)
 
         shared = {
             "seq": msg.seq, "slot": msg.slot, "meter": trace.meter,
@@ -472,5 +520,22 @@ def start_background_loops(socketio, svc) -> None:
             except Exception:
                 log.exception("janitor error")
 
+    def idle_nudge_loop() -> None:
+        """A conversation that's gone quiet gets a gentle "see your verdict?" prompt instead of just
+        hanging there — never auto-ends or auto-redirects the chat, just offers the link."""
+        while True:
+            socketio.sleep(min(30.0, max(5.0, cfg.IDLE_VERDICT_NUDGE_S / 4)))
+            try:
+                now = time.time()
+                for room in svc.rooms.rooms_gone_quiet(cfg.IDLE_VERDICT_NUDGE_S, cfg.MIN_MESSAGES_FOR_VERDICT, now):
+                    with room.lock:
+                        if room.status != "active" or room.verdict_nudged_at is not None:
+                            continue   # settled elsewhere between the scan and the lock
+                        room.verdict_nudged_at = now
+                    socketio.emit("verdict_nudge", {"idle_s": int(now - room.last_message_at)}, to=room.id)
+            except Exception:
+                log.exception("idle nudge loop error")
+
     socketio.start_background_task(matchmaker_loop)
     socketio.start_background_task(janitor_loop)
+    socketio.start_background_task(idle_nudge_loop)

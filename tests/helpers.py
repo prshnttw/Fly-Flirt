@@ -1,10 +1,14 @@
 """Test helpers: simulated browsers (Flask cookie jar + Socket.IO client)."""
 from __future__ import annotations
 
+import itertools
 import time
 
 from flyflirt import create_app, socketio
 from flyflirt.config import TestConfig
+
+_NEXT_ID = itertools.count(1)
+_NICKNAME_EVENTS = {"queue_join", "invite_create", "invite_join"}
 
 
 def make_app(**overrides):
@@ -21,8 +25,13 @@ class Browser:
         self.http.get("/healthz")  # any request issues the session cookie
         self.sio = socketio.test_client(app, flask_test_client=self.http)
         self.log: list[dict] = []
+        self.default_nick = f"Tester{next(_NEXT_ID)}"
 
     def emit(self, name: str, data=None) -> None:
+        # Nicknames are compulsory server-side; tests that aren't specifically exercising that
+        # behaviour don't need to spell one out every time, so fill one in here by default.
+        if name in _NICKNAME_EVENTS and isinstance(data, dict) and not data.get("nickname"):
+            data = {**data, "nickname": self.default_nick}
         self.sio.emit(name, data)
 
     def pump(self) -> None:

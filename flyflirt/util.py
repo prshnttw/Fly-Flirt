@@ -13,7 +13,12 @@ INVITE_LENGTH = 6
 
 _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏ -‮⁠-⁤﻿]")
 _WS_RE = re.compile(r"\s+")
-_NICK_RE = re.compile(r"[^\w \-.]", re.UNICODE)
+# A closed, curated set of single-codepoint emoji a nickname may carry (matches the client's random
+# generator). Deliberately not "any emoji": open-ended emoji input invites ZWJ/skin-tone/variation-selector
+# sequences and visual-spoofing homoglyphs, which is more trouble than it's worth for a nickname.
+NICKNAME_EMOJI = ("🦋", "🐝", "🦗", "🐛", "🦟", "🐞", "✨", "🌙", "🔥", "💫", "🌟", "🐜")
+MAX_NICK_LEN = 24  # keep in sync with the `maxlength` on every nickname <input>
+_NICK_RE = re.compile(r"[^\w \-." + re.escape("".join(NICKNAME_EMOJI)) + r"]", re.UNICODE)
 
 
 def new_room_id() -> str:
@@ -56,7 +61,7 @@ def clean_nickname(raw: object, fallback: str = "") -> str:
     if not isinstance(raw, str):
         return fallback
     text = _NICK_RE.sub("", unicodedata.normalize("NFKC", raw))
-    text = _WS_RE.sub(" ", _CONTROL_RE.sub(" ", text)).strip()[:18]
+    text = _WS_RE.sub(" ", _CONTROL_RE.sub(" ", text)).strip()[:MAX_NICK_LEN]
     return text or fallback
 
 

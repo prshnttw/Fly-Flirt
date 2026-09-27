@@ -17,6 +17,14 @@
         <summary class="btn btn-sm">Chat options <span aria-hidden="true">⌄</span></summary>
         <div class="chat-options-list glass">
           <a class="btn btn-sm btn-ghost" href="{{ url_for('pages.how') }}" target="_blank" rel="noopener">How it works <span class="sr-only">(opens in a new tab)</span></a>
+          <div class="privacy-row">
+            <label class="switch">
+              <input type="checkbox" id="privacy-toggle" role="switch">
+              <span class="track" aria-hidden="true"></span>
+              <span>Save this chat</span>
+            </label>
+            <p class="muted" id="privacy-sub"></p>
+          </div>
           <button class="btn btn-sm btn-ghost" id="report" type="button">Report conversation</button>
           <button class="btn btn-sm btn-ghost" id="block" type="button" title="Block this person and end the chat">Block person</button>
         </div>
@@ -32,6 +40,11 @@
         <div class="presence" id="presence" aria-live="polite"></div>
       </div>
       <div class="notice" id="notice" hidden></div>
+      <div class="nudge" id="nudge" hidden role="status">
+        <span id="nudge-text">It's gone quiet. Want to see your verdict?</span>
+        <a class="btn btn-sm btn-primary" id="nudge-verdict" href="{{ url_for('pages.verdict', room_id=boot.room_id) }}">See verdict</a>
+        <button class="btn btn-sm btn-ghost" id="nudge-dismiss" type="button" aria-label="Dismiss">✕</button>
+      </div>
       <div class="msgs" id="msgs" role="log" aria-live="polite" aria-relevant="additions"></div>
       <div class="typing" id="typing" aria-live="polite"></div>
       <form class="composer" id="composer" autocomplete="off">

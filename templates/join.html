@@ -8,8 +8,9 @@
       <h1 class="match-title">You're invited to a chat</h1>
       <p class="muted">Someone wants to talk with you while a real fruit-fly brain reads along.</p>
       <div class="big-code" aria-label="Invite code">{{ code }}</div>
-      <div class="nick-row"><label class="sr-only" for="nick">Nickname (optional)</label>
-        <input class="input" id="nick" maxlength="18" placeholder="Your nickname (optional)" style="text-align:center"></div>
+      <div class="nick-row"><label class="sr-only" for="nick">Nickname</label>
+        <input class="input" id="nick" maxlength="24" placeholder="Your nickname" style="text-align:center" required>
+        <button class="btn btn-ghost dice-btn" id="nick-dice" type="button" title="Random nickname" aria-label="Generate a random nickname">🎲</button></div>
       <button class="btn btn-primary btn-block" id="join" type="button">Join the chat</button>
       <p class="muted" id="err" style="margin-top:.9rem;font-size:.85rem" role="alert"></p>
       <p class="privacy-note">Messages are analysed by an AI service (Groq) and kept for {{ retention_days }} days. Please don't share sensitive information.</p>

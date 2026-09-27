@@ -21,6 +21,14 @@ class MatchmakingFlowTests(unittest.TestCase):
     def setUp(self):
         self.app = make_app()
 
+    def test_nickname_is_compulsory(self):
+        for name, payload in (("queue_join", {"mode": "male"}), ("invite_create", {"mode": "friends"}),
+                               ("invite_join", {"code": "ABCDEF"})):
+            a = Browser(self.app)
+            a.sio.emit(name, {**payload, "nickname": ""})   # bypass the test helper's auto-fill
+            got = a.wait("error_message")
+            self.assertEqual(got["code"], "nickname_required", name)
+
     def test_male_and_female_are_paired_and_get_distinct_slots(self):
         a, b, room_id, ma, mb = pair_up(self.app, "male", "female")
         self.assertEqual(ma["mode"], "flirt")
@@ -411,6 +419,44 @@ class ChatFlowTests(unittest.TestCase):
             a.emit("message", {"room_id": room_id, "text": f"spam {i}"})
         self.assertEqual(a.wait("error_message")["code"], "slow_down")
 
+    def test_seen_receipts_are_live_only_and_never_regress(self):
+        self.chat(2)   # a's message (seq 0), then b's (seq 1)
+        self.b.emit("seen", {"room_id": self.room_id, "seq": 1})
+        self.assertEqual(self.a.wait("seen"), {"slot": 1, "seq": 1})
+        self.assertFalse(self.b.has("seen"))   # you don't get an echo of your own receipt
+        self.b.emit("seen", {"room_id": self.room_id, "seq": 0})   # an older ack must not un-see anything
+        self.assertFalse(self.a.has("seen"))
+        # a fresh join sees the current state, but nothing is ever written to the database
+        state = enter_room(self.a, self.room_id)
+        self.assertEqual(state["room"]["seen"], {"1": 1})
+        row = self.svc.storage.load_room(self.room_id)
+        self.assertNotIn("seen", row["room"])
+
+    def test_seen_rejects_bad_input(self):
+        self.chat(1)
+        self.a.emit("seen", {"room_id": self.room_id, "seq": 999})     # out of range
+        self.assertFalse(self.b.has("seen"))
+        self.a.emit("seen", {"room_id": self.room_id, "seq": "nope"})  # not a number
+        self.assertFalse(self.b.has("seen"))
+        outsider = Browser(self.app)
+        outsider.emit("seen", {"room_id": self.room_id, "seq": 0})
+        self.assertFalse(self.b.has("seen"))
+
+    def test_room_privacy_toggle_overrides_the_server_default_either_way(self):
+        self.assertIsNone(self.state_a["room"]["store_override"])
+        self.assertEqual(self.state_a["retain_text_default"], self.svc.retain_text_default)
+        self.a.emit("set_privacy", {"room_id": self.room_id, "store": False})
+        changed = self.a.wait("privacy_changed")
+        self.assertEqual(changed, {"store_override": False, "effective": False})
+        self.assertEqual(self.b.wait("privacy_changed"), changed)
+        self.assertEqual(self.svc.rooms.get(self.room_id).store_override, False)
+        # flipping back to "use the server default" is also possible
+        self.b.emit("set_privacy", {"room_id": self.room_id, "store": None})
+        back = self.b.wait("privacy_changed")
+        self.assertEqual(back, {"store_override": None, "effective": self.svc.retain_text_default})
+        self.a.emit("set_privacy", {"room_id": self.room_id, "store": "yes please"})
+        self.assertEqual(self.a.wait("error_message")["code"], "bad_privacy")
+
     def test_leaving_ends_the_chat_but_keeps_the_verdict(self):
         self.chat(6)
         self.b.emit("leave_room", {"room_id": self.room_id})
@@ -445,35 +491,120 @@ class ChatFlowTests(unittest.TestCase):
         self.assertEqual(outsider.http.post(f"/api/rooms/{self.room_id}/report", json={}).status_code, 403)
 
 
+class IdleNudgeTests(unittest.TestCase):
+    def test_a_quiet_verdict_ready_chat_gets_nudged_once(self):
+        from flyflirt.sockets import start_background_loops
+        app = make_app(IDLE_VERDICT_NUDGE_S=1)
+        start_background_loops(__import__("flyflirt").socketio, app.extensions["flyflirt"])
+        a, b, room_id, _, _ = pair_up(app)
+        enter_room(a, room_id)
+        enter_room(b, room_id)
+        for speaker, text in CHAT:   # 3 messages each side -> reaches MIN_MESSAGES_FOR_VERDICT
+            send(a if speaker == "a" else b, room_id, text, [a, b])
+        nudge = a.wait("verdict_nudge", timeout=6)
+        self.assertGreaterEqual(nudge["idle_s"], 1)
+        self.assertEqual(b.wait("verdict_nudge", timeout=2), nudge)
+        # it does not keep firing every tick while still quiet
+        import time as _time
+        _time.sleep(2)
+        self.assertFalse(a.has("verdict_nudge"))
+        # a fresh message clears the flag, so a later quiet spell can nudge again
+        send(a, room_id, "still here!", [a, b])
+        self.assertTrue(a.wait("verdict_nudge", timeout=6))
+
+    def test_a_short_or_not_verdict_ready_chat_is_never_nudged(self):
+        app = make_app(IDLE_VERDICT_NUDGE_S=1)
+        a, b, room_id, _, _ = pair_up(app)
+        enter_room(a, room_id)
+        enter_room(b, room_id)
+        send(a, room_id, "just one message", [a, b])   # below MIN_MESSAGES_FOR_VERDICT
+        self.assertEqual(app.extensions["flyflirt"].rooms.rooms_gone_quiet(0, 3, time.time() + 5), [])
+
+
 class RestoreTests(unittest.TestCase):
+    def _chat_then_restart(self, tmp, **overrides):
+        path = os.path.join(tmp, "test.db")
+        app = make_app(DB_PATH=path, **overrides)
+        a, b, room_id, _, _ = pair_up(app)
+        enter_room(a, room_id)
+        enter_room(b, room_id)
+        for speaker, text in CHAT:
+            send(a if speaker == "a" else b, room_id, text, [a, b])
+        live = app.extensions["flyflirt"].rooms.get(room_id)
+        meter_before = live.engine.meter()
+        _, verdict_before = a.json(f"/api/rooms/{room_id}/verdict")
+        app.extensions["flyflirt"].storage.close()
+
+        # "restart": a brand-new service container over the same database file
+        cfg = type("Cfg", (app.extensions["flyflirt"].config,), {"DB_PATH": path})
+        fresh = build_services(cfg)
+        return fresh, fresh.rooms.get(room_id), room_id, meter_before, verdict_before
+
     def test_room_is_rebuilt_from_the_database_after_a_restart(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "test.db")
-            app = make_app(DB_PATH=path)
-            a, b, room_id, _, _ = pair_up(app)
-            enter_room(a, room_id)
-            enter_room(b, room_id)
-            for speaker, text in CHAT:
-                send(a if speaker == "a" else b, room_id, text, [a, b])
-            live = app.extensions["flyflirt"].rooms.get(room_id)
-            meter_before = live.engine.meter()
-            _, verdict_before = a.json(f"/api/rooms/{room_id}/verdict")
-            app.extensions["flyflirt"].storage.close()
-
-            # "restart": a brand-new service container over the same database file
-            cfg = type("Cfg", (app.extensions["flyflirt"].config,), {"DB_PATH": path})
-            fresh = build_services(cfg)
-            restored = fresh.rooms.get(room_id)
+            fresh, restored, room_id, meter_before, verdict_before = self._chat_then_restart(tmp)
             self.assertIsNotNone(restored)
             self.assertEqual(len(restored.messages), 6)
             self.assertAlmostEqual(restored.engine.meter(), meter_before, places=5)
-            self.assertEqual([m.text for m in restored.messages], [t for _, t in CHAT])
             self.assertEqual(restored.participants[0].nickname, "Ana")
             from flyflirt.verdict import build_verdict
             v = build_verdict(restored, fresh.connectome, fresh.engine_cfg)
             self.assertEqual(v["totals"], verdict_before["totals"])
             self.assertEqual([m["responsible_cells"] for m in v["messages"]],
                              [m["responsible_cells"] for m in verdict_before["messages"]])
+            fresh.storage.close()
+
+    def test_message_text_is_not_retained_in_a_real_deployment(self):
+        """A real deployment (APP_ENV=production) never writes your words to disk by default: the
+        neural simulation survives a restart bit-for-bit, but the transcript does not."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fresh, restored, room_id, meter_before, verdict_before = self._chat_then_restart(tmp, ENV="production")
+            self.assertEqual([m.text for m in restored.messages], [""] * 6)
+            self.assertEqual([m.diary for m in restored.messages], [""] * 6)
+            self.assertTrue(all(m.params for m in restored.messages))   # the numbers *are* still there
+            from flyflirt.verdict import build_verdict
+            v = build_verdict(restored, fresh.connectome, fresh.engine_cfg)
+            self.assertTrue(all(m["text"] == "(message text was not stored on the server)" for m in v["messages"]))
+            fresh.storage.close()
+
+    def test_message_text_is_retained_by_default_for_a_local_run(self):
+        """Someone running this off their own clone (APP_ENV unset/development) gets the opposite
+        default, since it's their own machine."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fresh, restored, room_id, meter_before, verdict_before = self._chat_then_restart(tmp, ENV="development")
+            self.assertEqual([m.text for m in restored.messages], [t for _, t in CHAT])
+            fresh.storage.close()
+
+    def test_either_default_can_be_overridden_explicitly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fresh, restored, room_id, _, _ = self._chat_then_restart(tmp, ENV="production", RETAIN_MESSAGE_TEXT=True)
+            self.assertEqual([m.text for m in restored.messages], [t for _, t in CHAT])
+            fresh.storage.close()
+        with tempfile.TemporaryDirectory() as tmp2:
+            fresh2, restored2, room_id2, _, _ = self._chat_then_restart(tmp2, ENV="development", RETAIN_MESSAGE_TEXT=False)
+            self.assertEqual([m.text for m in restored2.messages], [""] * 6)
+            fresh2.storage.close()
+
+    def test_a_room_can_opt_out_of_storage_even_when_the_server_default_is_to_keep_text(self):
+        """The per-room 'save this chat' choice overrides the server default in either direction."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "test.db")
+            app = make_app(DB_PATH=path, ENV="development")   # server default here is "retain"
+            a, b, room_id, _, _ = pair_up(app)
+            enter_room(a, room_id)
+            enter_room(b, room_id)
+            a.emit("set_privacy", {"room_id": room_id, "store": False})
+            changed = a.wait("privacy_changed")
+            self.assertEqual(changed, {"store_override": False, "effective": False})
+            self.assertEqual(b.wait("privacy_changed"), changed)
+            for speaker, text in CHAT:
+                send(a if speaker == "a" else b, room_id, text, [a, b])
+            app.extensions["flyflirt"].storage.close()
+            cfg = type("Cfg", (app.extensions["flyflirt"].config,), {"DB_PATH": path})
+            fresh = build_services(cfg)
+            restored = fresh.rooms.get(room_id)
+            self.assertEqual([m.text for m in restored.messages], [""] * 6)
+            self.assertEqual(restored.store_override, False)
             fresh.storage.close()
 
 

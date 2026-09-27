@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Admin · Fly//Flirt{% endblock %}
+{% block body %}
+<div class="prose">
+  <h1>Admin</h1>
+  <p class="muted">{{ stats.online }} online · {{ stats.chats_active }} active chats · {{ stats.chats_today }} chats today. Not linked from anywhere in the app; nothing here is indexed.</p>
+
+  <h2>Unresolved reports ({{ reports|length }})</h2>
+  {% if not reports %}
+    <p class="muted">Nothing waiting for review.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>When</th><th>Category</th><th>Reason</th><th>Reported</th><th>Reporter</th><th></th></tr></thead>
+    <tbody>
+      {% for r in reports %}
+      <tr>
+        <td class="mono">{{ r.when }}</td>
+        <td>{{ r.category or '—' }}</td>
+        <td>{{ r.reason or '—' }}</td>
+        <td class="mono">{{ r.reported_short }}…</td>
+        <td class="mono">{{ r.reporter_short }}…</td>
+        <td style="white-space:nowrap">
+          <form method="post" action="{{ url_for('admin.resolve', report_id=r.id) }}" style="display:inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="btn btn-sm" type="submit">Resolve</button>
+          </form>
+          {% if r.reported %}
+          <form method="post" action="{{ url_for('admin.extend_ban', client_id=r.reported) }}" class="confirm-form" data-confirm="Ban this client for 24 hours?" style="display:inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="btn btn-sm btn-danger" type="submit">Ban 24h</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <h2>Active bans ({{ bans|length }})</h2>
+  {% if not bans %}
+    <p class="muted">Nobody is currently banned.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Client</th><th>Reason</th><th>Time left</th><th></th></tr></thead>
+    <tbody>
+      {% for b in bans %}
+      <tr>
+        <td class="mono">{{ b.client[:14] }}…</td>
+        <td>{{ b.reason or '—' }}</td>
+        <td>{{ (b.seconds_left // 60) }} min</td>
+        <td>
+          <form method="post" action="{{ url_for('admin.unban', client_id=b.client) }}" style="display:inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button class="btn btn-sm" type="submit">Unban</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <p class="muted" style="margin-top:2rem;font-size:.78rem">Client ids are truncated on purpose (the session id, not a real identity). Chat text is never in this database by default — see the Privacy section of <a href="{{ url_for('pages.how') }}">how it works</a>.</p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/admin.js') }}?v={{ asset_v }}"></script>{% endblock %}

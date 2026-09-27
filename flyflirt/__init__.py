@@ -84,10 +84,11 @@ def create_app(config=None) -> Flask:
     )
 
     from .sockets import register_socket_handlers, start_background_loops
-    from .web import api_bp, pages_bp
+    from .web import admin_bp, api_bp, pages_bp
 
     app.register_blueprint(pages_bp)
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(admin_bp)
     register_socket_handlers(socketio, services)
     if not app.config.get("TESTING"):
         start_background_loops(socketio, services)

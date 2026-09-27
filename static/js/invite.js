@@ -6,6 +6,9 @@
 
   if (window.FlyBrain) new FlyBrain($('#bg'), { interactive: false, autoRotate: true, rotateSpeed: 0.0012, distance: 2.6, rest: 0.28 });
 
+  if (boot.nick) $('#nick').value = boot.nick;
+  FF.wireNickname($('#nick'), $('#nick-dice'));   // fills a random one only if still empty
+
   function url() { return location.origin + invite.path; }
   function err(t) { $('#err').textContent = t || ''; }
 
@@ -18,16 +21,23 @@
     if (navigator.share) $('#share').hidden = false;
   }
 
-  $('#make').addEventListener('click', function () { err(); socket.emit('invite_create', { mode: 'friends', nickname: boot.nick }); });
+  $('#make').addEventListener('click', function () {
+    var nick = FF.requireNickname($('#nick'));
+    if (!nick) return;
+    err(); socket.emit('invite_create', { mode: 'friends', nickname: nick });
+  });
   $('#have').addEventListener('click', function () {
+    if (!FF.requireNickname($('#nick'))) return;
     $('#choose').hidden = true; $('#code-form').hidden = false; $('#code-in').focus();
     $('#sub').textContent = 'Type the 6-character code your buddy sent you.';
   });
   $('#code-form').addEventListener('submit', function (e) {
     e.preventDefault();
+    var nick = FF.requireNickname($('#nick'));
+    if (!nick) return;
     var raw = $('#code-in').value.replace(/[\s\-_]/g, '').toUpperCase();
     if (raw.length !== 6) return err('Invite codes have 6 characters.');
-    window.location.href = '/join/' + encodeURIComponent(raw) + '?go=1' + (boot.nick ? '&nick=' + encodeURIComponent(boot.nick) : '');
+    window.location.href = '/join/' + encodeURIComponent(raw) + '?go=1&nick=' + encodeURIComponent(nick);
   });
   $('#copy-code').addEventListener('click', function () { if (invite) FF.copy(invite.code, 'Code copied!'); });
   $('#copy-link').addEventListener('click', function () { if (invite) FF.copy(url(), 'Link copied!'); });
@@ -38,7 +48,7 @@
 
   socket.on('connect', function () {
     $('#cdot').className = 'dot live'; $('#cstate').textContent = 'connected';
-    if (wantCode) socket.emit('invite_create', { mode: 'friends', nickname: boot.nick });   // same code after a reconnect
+    if (wantCode) socket.emit('invite_create', { mode: 'friends', nickname: $('#nick').value.trim() || boot.nick });   // same code after a reconnect
   });
   socket.on('disconnect', function () { $('#cdot').className = 'dot off'; $('#cstate').textContent = 'reconnecting…'; });
   socket.on('invite_created', showCode);

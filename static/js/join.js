@@ -4,6 +4,7 @@
   FF.prefs.save(null);   // an invite chat has no 'next person'
   var socket = FF.socket(), busy = false, watchdog = null, auto = /[?&]go=1(&|$)/.test(location.search);
   if (boot.nick) $('#nick').value = boot.nick;
+  FF.wireNickname($('#nick'), $('#nick-dice'));   // fills a random one only if still empty
 
   var REASONS = {
     invalid: 'That code is not valid.',
@@ -16,11 +17,13 @@
 
   function join() {
     if (busy) return;
+    var nick = FF.requireNickname($('#nick'));
+    if (!nick) return;
     busy = true;
     $('#err').textContent = '';
     $('#join').disabled = true;
     $('#join').textContent = 'Joining…';
-    socket.emit('invite_join', { code: boot.code, nickname: $('#nick').value.trim() });
+    socket.emit('invite_join', { code: boot.code, nickname: nick });
     clearTimeout(watchdog);
     watchdog = setTimeout(function () {
       if (!busy) return;

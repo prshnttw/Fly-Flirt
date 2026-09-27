@@ -6,7 +6,8 @@
   var S = {
     slot: boot.slot, room: null, parts: [], counts: { 0: 0, 1: 0 }, min: boot.min_for_verdict || 3,
     maxLen: boot.max_len || 400, status: 'active', bubbles: {}, latestSeq: -1, totals: { cells: 1350, edges: 50158 },
-    typingTimer: null, lastTypingSent: 0, stateTimer: null, ready: false
+    typingTimer: null, lastTypingSent: 0, stateTimer: null, ready: false,
+    lastAckedSeq: -1, partnerSeenUpTo: -1
   };
   var msgsBox = $('#msgs'), input = $('#input'), sendBtn = $('#send');
 
@@ -70,11 +71,38 @@
       el('div', { class: 'bubble', text: m.text }),
       chips);
     msgsBox.appendChild(node);
-    S.bubbles[m.seq] = { node: node, chips: chips };
+    S.bubbles[m.seq] = { node: node, chips: chips, slot: m.slot };
     if (m.analysed) fillChips(m.seq, m); else chips.appendChild(el('span', { class: 'chip wait', text: 'fly is reading…' }));
     scrollDown(followMessage);
     return S.bubbles[m.seq];
   }
+
+  /* ---------------- delivery receipts ("seen") — live only, nothing here is ever stored ---------------- */
+  function ackSeen() {
+    if (document.hidden) return;
+    var bestSeq = -1;
+    Object.keys(S.bubbles).forEach(function (seq) {
+      seq = +seq;
+      if (S.bubbles[seq].slot !== S.slot && seq > bestSeq) bestSeq = seq;
+    });
+    if (bestSeq > S.lastAckedSeq) {
+      S.lastAckedSeq = bestSeq;
+      socket.emit('seen', { room_id: boot.room_id, seq: bestSeq });
+    }
+  }
+  function updateSeenMark() {
+    var prev = FF.$('.seen-mark', msgsBox);
+    if (prev) prev.remove();
+    var bestSeq = -1;
+    Object.keys(S.bubbles).forEach(function (seq) {
+      seq = +seq;
+      if (S.bubbles[seq].slot === S.slot && seq <= S.partnerSeenUpTo && seq > bestSeq) bestSeq = seq;
+    });
+    if (bestSeq === -1) return;
+    S.bubbles[bestSeq].node.appendChild(el('div', { class: 'seen-mark', text: 'Seen' }));
+  }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) ackSeen(); });
+  window.addEventListener('focus', ackSeen);
 
   var CHANNEL_SHORT = { brake_m1: 'mAL brake', brake_m8: 'mAL brake', banter: 'AVLP banter', attention: 'LC16 vision', confiding: 'lateral horn', vigor: 'FLA input', feedback: 'AN feedback' };
   function fillChips(seq, u) {
@@ -247,6 +275,11 @@
     updateCount();
     if (S.status === 'active') input.focus();
     requestAnimationFrame(function () { scrollDown(true); });
+    S.lastAckedSeq = -1; ackSeen();
+    S.partnerSeenUpTo = (st.room.seen && st.room.seen[String(1 - S.slot)]) != null ? st.room.seen[String(1 - S.slot)] : -1;
+    updateSeenMark();
+    applyPrivacy(st.room.store_override, st.room.store_override == null ? st.retain_text_default : st.room.store_override);
+    $('#nudge').hidden = true;
   });
 
   function applyStatus() {
@@ -274,7 +307,14 @@
     S.counts = { 0: +m.message_counts['0'], 1: +m.message_counts['1'] };
     setVerdict(false, S.counts);
     if (m.slot !== S.slot) { $('#typing').textContent = ''; }
+    $('#nudge').hidden = true;   // the conversation just moved again
+    ackSeen();
   });
+  socket.on('seen', function (p) {
+    if (p.slot === 1 - S.slot) { S.partnerSeenUpTo = p.seq; updateSeenMark(); }
+  });
+  socket.on('verdict_nudge', function () { $('#nudge').hidden = false; });
+  $('#nudge-dismiss').addEventListener('click', function () { $('#nudge').hidden = true; });
   socket.on('analysing', function () { setState('analysing', 'analysing'); });
   socket.on('fly_update', function (u) { applyUpdate(u); });
   socket.on('brain_wave', function (w) {
@@ -328,6 +368,19 @@
       if (e.code === 'full_busy' || e.code === 'no_full' || e.code === 'bad_scale') { toggle.checked = boot.scale === 'full'; toggle.disabled = false; note.hidden = true; }
     });
   }
+
+  /* ---------------- privacy: does this chat's text get saved? ---------------- */
+  var privacyToggle = $('#privacy-toggle'), privacySub = $('#privacy-sub');
+  function applyPrivacy(storeOverride, effective) {
+    privacyToggle.checked = !!effective;
+    privacySub.textContent = storeOverride == null
+      ? (effective ? 'Not chosen: this server keeps chat text by default.' : 'Not chosen: this server does not keep chat text by default.')
+      : (effective ? 'Chosen: this chat is being saved.' : 'Chosen: this chat is not being saved.');
+  }
+  privacyToggle.addEventListener('change', function () {
+    socket.emit('set_privacy', { room_id: boot.room_id, store: privacyToggle.checked });
+  });
+  socket.on('privacy_changed', function (p) { applyPrivacy(p.store_override, p.effective); });
 
   /* Close the native disclosure after a choice, outside click, or Escape. */
   var options = $('#chat-options'), optionsSummary = options.querySelector('summary');

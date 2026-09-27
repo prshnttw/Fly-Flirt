@@ -40,6 +40,13 @@ def _bool(name: str, default: bool) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _bool_or_none(name: str) -> bool | None:
+    """Like ``_bool``, but returns ``None`` (rather than a fixed default) when unset, so a caller can
+    tell "explicitly set" apart from "use whatever the situation implies" — see RETAIN_MESSAGE_TEXT."""
+    value = _env(name)
+    return None if value is None else value.strip().lower() in ("1", "true", "yes", "on")
+
+
 @dataclass
 class LLMModelSpec:
     """One entry in the LLM fallback chain, e.g. ``groq:qwen/qwen3.8-27b``."""
@@ -77,6 +84,11 @@ class Config:
     ENV = _env("APP_ENV", "development")
     DEBUG = _bool("FLASK_DEBUG", False)
     SECRET_KEY = _env("SECRET_KEY")
+    # The tiny /admin reports page (see flyflirt/web/admin.py) only exists at all when BOTH of these are
+    # set; leave either unset and every /admin/* route 404s, indistinguishable from not existing. It's
+    # HTTP Basic Auth, so it only makes sense served over HTTPS (true on Railway/Fly by default).
+    ADMIN_USERNAME = _env("ADMIN_USERNAME")
+    ADMIN_PASSWORD = _env("ADMIN_PASSWORD")
     PORT = _int("PORT", 5000)
 
     # storage
@@ -88,11 +100,24 @@ class Config:
     FULL_ENABLED = _bool("FULL_ENABLED", True)
     FULL_MAX_ROOMS = _int("FULL_MAX_ROOMS", 8)   # cap on concurrent full-pathway rooms (each step costs ~45 ms of CPU)
     RETENTION_DAYS = _int("RETENTION_DAYS", 7)
+    # Privacy-by-design default that adapts to how the app is being run: a real deployment
+    # (APP_ENV=production, e.g. the Railway guide below) defaults to never writing your words to disk —
+    # only the *numbers* derived from them (LLM params, which neurons/synapses fired) are persisted,
+    # which is all the verdict/replay machinery needs. Someone running this locally off their own clone
+    # (APP_ENV unset/development) gets the opposite default, since it's their own machine and keeping the
+    # transcript is usually more useful there than a privacy risk. None here means "not explicitly set" —
+    # see Services.retain_text_default, which resolves the ENV-based default; RETAIN_MESSAGE_TEXT itself
+    # stays None/True/False so a subclass (tests) can override ENV and have the default follow it. Any
+    # individual chat can override the *result* again at the room level (Room.store_override / the "Save
+    # this chat" toggle in the chat page). The live chat (in memory, for as long as the process runs) is
+    # unaffected either way; this only controls what a restart/reconnect can recover.
+    RETAIN_MESSAGE_TEXT = _bool_or_none("RETAIN_MESSAGE_TEXT")
 
     # matchmaking
     MATCH_TIMEOUT_S = _int("MATCH_TIMEOUT_S", 120)
     INVITE_TTL_S = _int("INVITE_TTL_S", 1800)
     ROOM_IDLE_TTL_S = _int("ROOM_IDLE_TTL_S", 6 * 3600)
+    IDLE_VERDICT_NUDGE_S = _int("IDLE_VERDICT_NUDGE_S", 300)   # gone quiet for this long -> "see your verdict?"
     RECONNECT_GRACE_S = _int("RECONNECT_GRACE_S", 25)
 
     # chat

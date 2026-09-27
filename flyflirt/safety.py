@@ -79,6 +79,18 @@ class Safety:
                 return 0
             return int(left) + 1
 
+    def unban(self, client: str) -> None:
+        with self._lock:
+            self._bans.pop(client, None)
+        self.storage.delete_ban(client)
+
+    def list_bans(self) -> list[dict]:
+        now = time.time()
+        with self._lock:
+            entries = list(self._bans.items())
+        return [{"client": c, "until": until, "reason": reason, "seconds_left": max(0, int(until - now))}
+                for c, (until, reason) in sorted(entries, key=lambda e: -e[1][0])]
+
     # -- strikes (blocked messages) ----------------------------------------------------
     def strike(self, client: str) -> tuple[int, bool]:
         """Record a blocked message. Returns (strikes in window, True if the client is now banned)."""

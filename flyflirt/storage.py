@@ -79,8 +79,13 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 
 
 class Storage:
-    def __init__(self, path: str):
+    def __init__(self, path: str, retain_text: bool = False):
         self.path = path
+        # Privacy-by-design default (see Config.RETAIN_MESSAGE_TEXT): the words people typed, and the
+        # LLM's paraphrase of them (diary/tip/topic), are not written to disk unless explicitly opted in.
+        # The numbers derived from a message (params, provider, timing) are kept either way, since that's
+        # all the verdict/replay machinery needs. The live in-memory room is unaffected by this setting.
+        self.retain_text = retain_text
         if path != ":memory:":
             os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         self._lock = threading.RLock()
@@ -92,7 +97,9 @@ class Storage:
             self._db.execute("PRAGMA foreign_keys=ON")
             self._db.executescript(SCHEMA)
             for table, column, decl in (("reports", "reported", "TEXT"), ("reports", "category", "TEXT"),
-                                        ("rooms", "scale", "TEXT DEFAULT 'standard'")):   # migrate older databases
+                                        ("rooms", "scale", "TEXT DEFAULT 'standard'"),
+                                        ("rooms", "store_override", "INTEGER"),   # NULL = follow the server default
+                                        ("reports", "resolved", "INTEGER DEFAULT 0")):   # migrate older databases
                 try:
                     self._db.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
                 except sqlite3.OperationalError:
@@ -127,6 +134,10 @@ class Storage:
     def set_scale(self, room_id: str, scale: str) -> None:
         self._run("UPDATE rooms SET scale=? WHERE id=?", (scale, room_id))
 
+    def set_store_override(self, room_id: str, override: bool | None) -> None:
+        value = None if override is None else (1 if override else 0)
+        self._run("UPDATE rooms SET store_override=? WHERE id=?", (value, room_id))
+
     def clear_code(self, room_id: str) -> None:
         self._run("UPDATE rooms SET code=NULL WHERE id=?", (room_id,))
 
@@ -139,12 +150,16 @@ class Storage:
             (room_id, slot, client_id, label, nickname),
         )
 
-    def add_message(self, room_id: str, msg) -> None:
+    def add_message(self, room_id: str, msg, retain_text: bool | None = None) -> None:
+        """``retain_text`` overrides the server-wide default for this one call (used for a room's own
+        "save this chat" choice); leave it as None to just follow ``self.retain_text``."""
+        retain = self.retain_text if retain_text is None else retain_text
+        text, diary, tip, topic = (msg.text, msg.diary, msg.tip, msg.topic) if retain else ("", None, None, None)
         self._run(
             "INSERT OR REPLACE INTO messages (room_id, seq, slot, text, ts, params, diary, tip, topic, provider, degraded)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (room_id, msg.seq, msg.slot, msg.text, msg.ts, json.dumps(msg.params) if msg.params else None,
-             msg.diary, msg.tip, msg.topic, msg.provider, 1 if msg.degraded else 0),
+            (room_id, msg.seq, msg.slot, text, msg.ts, json.dumps(msg.params) if msg.params else None,
+             diary, tip, topic, msg.provider, 1 if msg.degraded else 0),
         )
 
     def load_room(self, room_id: str) -> dict | None:
@@ -204,6 +219,17 @@ class Storage:
         row = self._one("SELECT COUNT(DISTINCT reporter) AS n FROM reports WHERE reported=? AND ts>=?", (reported, since))
         return int(row["n"]) if row else 0
 
+    def list_reports(self, resolved: bool | None = None, limit: int = 200) -> list[dict]:
+        sql, params = "SELECT * FROM reports", ()
+        if resolved is not None:
+            sql += " WHERE resolved=?"
+            params = (1 if resolved else 0,)
+        sql += " ORDER BY ts DESC LIMIT ?"
+        return [dict(r) for r in self._all(sql, params + (limit,))]
+
+    def resolve_report(self, report_id: int, resolved: bool = True) -> None:
+        self._run("UPDATE reports SET resolved=? WHERE id=?", (1 if resolved else 0, report_id))
+
     # -- blocks & bans -----------------------------------------------------------------
     def add_block(self, blocker: str, blocked: str) -> None:
         self._run("INSERT OR REPLACE INTO blocks (blocker, blocked, ts) VALUES (?,?,?)", (blocker, blocked, time.time()))
@@ -217,6 +243,9 @@ class Storage:
     def load_bans(self, now: float) -> list[tuple[str, float, str]]:
         self._run("DELETE FROM bans WHERE until < ?", (now,))
         return [(r["client"], r["until"], r["reason"]) for r in self._all("SELECT client, until, reason FROM bans")]
+
+    def delete_ban(self, client: str) -> None:
+        self._run("DELETE FROM bans WHERE client=?", (client,))
 
     # -- LLM usage counters (persist daily quota accounting across restarts) -----------
     def load(self, day: str) -> dict[str, tuple[int, int]]:
