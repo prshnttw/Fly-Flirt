@@ -2,13 +2,72 @@
 
 Two people chat (male/female "flirt" mode, or friends). Each message is scored by a Groq LLM into 7 parameters
 that drive a real MaleCNS fruit-fly connectome subgraph (1,350 cells, 50,158 synapses). The chat page shows the
-firing live in 3D; the verdict page attributes every activated neuron/connection to the message that caused it.
+firing live in 3D; Live Lab combines activity across chats; the verdict page attributes every activated neuron/connection to the message that caused it.
 
-## Run
-    python -m venv .venv && .venv\Scripts\pip install -r requirements-runtime.txt
-    copy .env.example .env   # set GROQ_API_KEY (LLM_API_KEY also accepted), SECRET_KEY
-    python app.py            # http://localhost:5000
-    python -m unittest discover -s tests
+## See it in action
+
+![Chat with the live 3D connectome in dark mode](docs/media/chat-dark.png)
+
+Messages drive simulated activity through real neuron identities and synaptic connections. Drag the brain
+to rotate it, scroll to zoom, and use the theme button to switch between dark and light mode.
+
+The animation follows four demo messages—curiosity, humor, warmth, and personal sharing—with pauses between firing bursts.
+
+![Live Lab displaying neural firing from varied fictional demo messages](docs/media/neurons-firing.gif)
+
+**Live Lab (`/lab`)** overlays firing from all active chats, without message text, room IDs, or authorship.
+It opens with **Full pathway** enabled when available. The standard view still receives every chat's activity,
+but displays only neurons and synapses shared with its smaller graph. Activity is mapped by neuron identity,
+not by reusing indices from a different graph.
+
+The chat and lab share the 3D renderer, wave cadence, and synapse animation. Chat also retains its own
+conversation's activity state; the lab overlays transient firing from multiple conversations.
+
+| Light-mode chat | Full-pathway Live Lab |
+| --- | --- |
+| ![Chat in light mode with gradient panels](docs/media/chat-light.png) | ![Full-pathway Live Lab](docs/media/live-lab.png) |
+
+*Screenshots and animation use fictional demo messages and the local heuristic scorer.
+The view shows a partial fruit-fly connectome, not a full brain surface or a measure of human attraction.*
+
+## Run locally
+
+Use Python 3 and a virtual environment. From the repository root:
+
+**macOS / Linux**
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-runtime.txt
+cp .env.example .env
+python app.py
+```
+
+**Windows (PowerShell)**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements-runtime.txt
+Copy-Item .env.example .env
+.venv\Scripts\python app.py
+```
+
+Before starting, edit `.env` to set `SECRET_KEY` and optionally `GROQ_API_KEY`
+(`LLM_API_KEY` is also accepted). Without an available LLM, the local heuristic scorer keeps the demo running.
+
+Open **http://localhost:5000** to start a chat or **http://localhost:5000/lab** for Live Lab.
+To see live firing, keep both views open and send a message in an active two-person chat.
+
+## Checks
+
+```sh
+python -m unittest discover -s tests
+node --test tests/test_frontend.cjs
+```
+
+The renderer checks cover camera framing, preservation of neuron coordinates and synaptic endpoints,
+and mapping activity between the standard and full graphs.
 
 ## LLM fallback
 Ordered chain (`LLM_CHAIN`) of Groq models with per-model circuit breakers and local RPM/TPM/RPD/TPD accounting.
@@ -18,7 +77,7 @@ If all are unavailable a built-in heuristic scorer answers instantly, so the app
 `flyflirt/` (engine, verdict, llm/, rooms, matchmaking, sockets, web/) · `templates/` · `static/` · `tools/` (offline connectome build) · `tests/`
 
 ## Full pathway (bigger brain)
-`static/connectome_full.json` (4,300 cells, 152,284 synapse pairs) is an opt-in view: either person can flip
+`static/connectome_full.json` (4,300 cells, 152,284 synapse pairs) is opt-in for chats: either person can flip
 the "Full pathway" switch under the brain and the chat is replayed on the bigger graph for both. Rebuild it with
 `python tools/build_connectome.py --context 4000 --out static/connectome_full.json` (needs `NEUPRINT_TOKEN`).
 Env: `FULL_ENABLED`, `FULL_MAX_ROOMS` (concurrent full rooms, default 8; each step costs ~45 ms CPU),
