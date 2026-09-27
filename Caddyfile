@@ -1,0 +1,5 @@
+# Caddy gets free, automatic HTTPS (Let's Encrypt) for whatever domain you put in DOMAIN in your
+# server's .env — e.g. yourname.duckdns.org. See local/oracle-deploy.md.
+{$DOMAIN} {
+	reverse_proxy app:8080
+}

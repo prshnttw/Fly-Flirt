@@ -184,6 +184,11 @@ class TestConfig(Config):
     DB_PATH = ":memory:"
     SECRET_KEY = "test-secret"
     LLM_ENABLED = False
+    # Tests must not inherit whatever happens to be in the developer's real .env (e.g. real admin
+    # credentials for local use) — that would make the "admin is off by default" tests flaky depending
+    # on what's sitting in .env. Force these off; individual tests opt back in explicitly.
+    ADMIN_USERNAME = None
+    ADMIN_PASSWORD = None
     MSG_BURST = 50
     MSG_REFILL_PER_S = 50.0
     JOIN_BURST = 500

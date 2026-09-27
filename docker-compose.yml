@@ -1,0 +1,43 @@
+# Self-hosting on your own VM (e.g. an Oracle Cloud "Always Free" instance), using the Dockerfile
+# already in this repo plus Caddy as an HTTPS reverse proxy. See local/oracle-deploy.md for the full
+# walkthrough (that file is gitignored; this one is not, since it needs to exist on the server).
+#
+# Usage on the server:
+#   docker compose up -d --build
+#   docker compose logs -f
+#   docker compose up -d --build   # again, after a `git pull`, to redeploy
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env               # GROQ_API_KEY / SECRET_KEY / etc. — on the server only, never committed
+    environment:
+      APP_ENV: production
+      DATA_DIR: /data
+      PORT: "8080"
+      SESSION_COOKIE_SECURE: "true"
+    volumes:
+      - flyflirt_data:/data
+    expose:
+      - "8080"                   # reachable from the caddy container only, never published to the host
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}           # read from .env by docker compose itself (not passed into the app)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  flyflirt_data:
+  caddy_data:
+  caddy_config:
