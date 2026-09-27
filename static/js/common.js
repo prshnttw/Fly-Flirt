@@ -138,6 +138,20 @@
     ta.remove();
   };
 
+  /* Save some client-built text as a downloaded file — no server round-trip, no data leaves the browser. */
+  FF.downloadText = function (filename, text) {
+    var blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = FF.el('a', { href: url, download: filename });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  };
+
+  /* Full date + time, for exports (FF.time gives just HH:MM, for the live chat meta line). */
+  FF.dateTime = function (ts) {
+    return new Date(ts * 1000).toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+
   FF.share = function (data) {
     if (navigator.share) { navigator.share(data).catch(function () {}); return true; }
     return false;

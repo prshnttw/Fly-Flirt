@@ -5,7 +5,7 @@
 
   var S = {
     slot: boot.slot, room: null, parts: [], counts: { 0: 0, 1: 0 }, min: boot.min_for_verdict || 3,
-    maxLen: boot.max_len || 400, status: 'active', bubbles: {}, latestSeq: -1, totals: { cells: 1350, edges: 50158 },
+    maxLen: boot.max_len || 400, status: 'active', bubbles: {}, transcript: [], latestSeq: -1, totals: { cells: 1350, edges: 50158 },
     typingTimer: null, lastTypingSent: 0, stateTimer: null, ready: false,
     lastAckedSeq: -1, partnerSeenUpTo: -1
   };
@@ -72,6 +72,7 @@
       chips);
     msgsBox.appendChild(node);
     S.bubbles[m.seq] = { node: node, chips: chips, slot: m.slot };
+    S.transcript[m.seq] = { slot: m.slot, ts: m.ts, text: m.text };
     if (m.analysed) fillChips(m.seq, m); else chips.appendChild(el('span', { class: 'chip wait', text: 'fly is reading…' }));
     scrollDown(followMessage);
     return S.bubbles[m.seq];
@@ -252,7 +253,7 @@
 
   socket.on('room_state', function (st) {
     S.room = st.room; S.parts = st.room.participants; S.slot = st.you; S.min = st.min_for_verdict; S.maxLen = st.max_len;
-    S.status = st.room.status; S.bubbles = {}; S.latestSeq = -1;
+    S.status = st.room.status; S.bubbles = {}; S.transcript = []; S.latestSeq = -1;
     msgsBox.textContent = '';
     st.messages.forEach(function (m) { addMessage(m); });
     if (!st.messages.length) addSystem('Say hi! Each message lights up real neurons in the fly brain.');
@@ -396,6 +397,29 @@
       options.open = false;
       optionsSummary.focus();
     }
+  });
+
+  /* ---------------- export: save the transcript you can already see, as a .txt file ---------------- */
+  /* Nothing here touches the server: everything needed is already in the browser, matching this app's
+     "your words aren't kept for you unless you keep them" design (see the Privacy section in README.md). */
+  $('#export-chat').addEventListener('click', function () {
+    var lines = S.transcript
+      .map(function (m, seq) { return m ? { seq: seq, m: m } : null; })
+      .filter(Boolean)
+      .map(function (row) {
+        var p = part(row.m.slot);
+        var who = row.m.slot === S.slot ? 'You' : (p ? p.nickname : 'Partner');
+        return '[' + FF.dateTime(row.m.ts) + '] ' + who + ': ' + row.m.text;
+      });
+    if (!lines.length) return FF.toast('Nothing to export yet.', 'warn');
+    var header = [
+      'Fly//Flirt chat export',
+      'Room: ' + boot.room_id,
+      'Exported: ' + FF.dateTime(Date.now() / 1000),
+      'Participants: ' + S.parts.map(function (p) { return p.nickname + ' (' + p.label + ')'; }).join(', '),
+      '', '—'.repeat(40), ''
+    ].join('\n');
+    FF.downloadText('flyflirt-chat-' + boot.room_id + '.txt', header + lines.join('\n') + '\n');
   });
 
   /* ---------------- safety: skip, block, report ---------------- */
