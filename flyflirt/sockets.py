@@ -17,7 +17,7 @@ import logging
 import time
 
 from flask import request, session
-from flask_socketio import emit, join_room
+from flask_socketio import emit, join_room, leave_room
 
 from .matchmaking import PAIRS, SEEKING, Ticket
 from .moderation import check_message
@@ -352,7 +352,16 @@ def register_socket_handlers(socketio, svc) -> None:
 
     @socketio.on("lab_subscribe")
     def on_lab_subscribe(data=None):
+        data = data if isinstance(data, dict) else {}
+        scale = data.get("scale", "standard")
+        if scale not in ("standard", "full"):
+            return fail("bad_scale", "Choose standard or full pathway.")
+        if scale == "full" and not svc.full_available:
+            return fail("no_full", "The full pathway is unavailable.")
+        leave_room("lab:standard")
+        leave_room("lab:full")
         join_room("lab")
+        join_room("lab:" + scale)
         emit("lab_stats", svc.stats())
 
     # -- messages ----------------------------------------------------------------------
@@ -461,15 +470,15 @@ def register_socket_handlers(socketio, svc) -> None:
                 continue
             for sid in set(other.sids):
                 socketio.emit("fly_update", {**shared, "private": False, "tip": msg.tip}, to=sid)
-        socketio.emit("brain_wave", {
-            "seq": msg.seq, "frames": step.frames,
+        wave = {
+            "frames": step.frames,
             "state": {"idx": step.state_idx, "val": step.state_val},
-        }, to=room.id)
-        # Anonymous live-lab pulse: neuron indices only, never text or authorship. The lab draws the
-        # standard connectome, so full-pathway rooms (different indices) don't feed it.
-        if room.scale == "standard":
-            frames = [{"cells": f["cells"][:80], "acts": f["acts"][:80]} for f in step.frames[:5]]
-            socketio.emit("lab_pulse", {"frames": frames}, to="lab")
+            "scale": room.scale,
+        }
+        socketio.emit("brain_wave", {"seq": msg.seq, **wave}, to=room.id)
+        # Identical neural data, with no message text, room ID or authorship.
+        socketio.emit("lab_pulse", wave, to="lab")
+
 
 
 def start_background_loops(socketio, svc) -> None:

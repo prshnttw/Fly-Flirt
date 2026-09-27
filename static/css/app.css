@@ -1,7 +1,7 @@
 /* ==========================================================================
    Fly//Flirt design system - dark cyber-bio glass, neon accents.
    ========================================================================== */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700;800&family=Syne:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,500&family=Syne:wght@600;700;800&display=swap');
 
 :root {
   --bg-space: #06050a;
@@ -28,9 +28,9 @@
   --bg-popover: #171323;
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --font-display: 'Syne', 'Outfit', sans-serif;
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+  --font-display: 'Syne', 'DM Sans', sans-serif;
 
   --r-sm: 8px;
   --r-md: 14px;
@@ -674,3 +674,25 @@ a.mode-btn { text-decoration: none; }
 .brain-layout-note { position: absolute; top: 2.2rem; left: 0.7rem; color: var(--text-3); font: 0.62rem var(--font-mono); pointer-events: none; }
 .bg-brain .brain-layout-note { display: none; }
 .lab-wrap .brain-layout-note { top: 0.7rem; left: 50%; transform: translateX(-50%); white-space: nowrap; }
+
+/* Light theme: the same atmospheric depth, with ink-colored neural activity. */
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(ellipse at 12% 18%, rgba(75, 205, 199, .24), transparent 52%),
+    radial-gradient(ellipse at 86% 35%, rgba(155, 124, 230, .25), transparent 55%),
+    radial-gradient(ellipse at 52% 100%, rgba(243, 174, 195, .23), transparent 55%),
+    #f3f4fc;
+}
+:root[data-theme="light"] .brain-wrap,
+:root[data-theme="light"] .lab-wrap {
+  background:
+    radial-gradient(ellipse at 25% 40%, rgba(68, 194, 186, .22), transparent 58%),
+    radial-gradient(ellipse at 78% 32%, rgba(141, 111, 219, .23), transparent 60%),
+    radial-gradient(ellipse at 55% 85%, rgba(232, 155, 190, .18), transparent 55%),
+    radial-gradient(ellipse at center, rgba(255,255,255,.65), rgba(232,237,249,.35));
+}
+:root[data-theme="light"] .glass {
+  background: linear-gradient(135deg, rgba(255,255,255,.86), rgba(245,242,255,.68));
+  border-color: rgba(255,255,255,.9);
+  box-shadow: 0 12px 36px rgba(82,67,129,.09), inset 0 1px 0 rgba(255,255,255,.95);
+}

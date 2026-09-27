@@ -5,6 +5,7 @@
 <header class="lab-top glass">
   <a class="brand" href="{{ url_for('pages.landing') }}">🪰 <span>Fly<span class="slash">//</span>Flirt</span> <span class="muted mono" style="font-size:.7rem;font-weight:400">live lab</span></a>
   <div class="actions">
+    <label class="pill"><input type="checkbox" role="switch" id="lab-scale-toggle"> Full pathway</label>
     <span class="pill"><span class="dot live"></span><b id="l-online">{{ boot.stats.online }}</b> online</span>
     <span class="pill"><b id="l-chats">{{ boot.stats.chats_active }}</b> chats firing</span>
     <a class="btn btn-sm btn-primary" href="{{ url_for('pages.landing') }}">Start a chat</a>
@@ -19,7 +20,7 @@
   <div class="lab-wrap" id="brain"></div>
 </main>
 <div class="lab-foot">
-  <span class="tag pill">Every flash is a real message somewhere, anonymised: only neuron indices, never text.</span>
+  <span class="tag pill">Live firing across all chats. Full pathway shows all neurons; standard shows the shared subset. No message text.</span>
   <span class="pill" id="l-legend"></span>
 </div>
 <div class="brain-tip" id="tip-hover" hidden></div>
