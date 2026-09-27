@@ -76,6 +76,36 @@
     return dataPromises[scale];
   }
 
+  // Map by stable neuron identities, never by indices from a different graph.
+  var activityMaps = {};
+  function mapActivity(wave, destination) {
+    var source = wave.scale || 'standard';
+    if (source === destination) return Promise.resolve(wave);
+    var key = source + ':' + destination;
+    if (!activityMaps[key]) activityMaps[key] = Promise.all([loadConnectome(source), loadConnectome(destination)]).then(function (graphs) {
+      var from = graphs[0], to = graphs[1], ids = new Map(), edges = new Map();
+      to.ids.forEach(function (id, i) { ids.set(id, i); });
+      for (var e = 0; e < to.src.length; e++) edges.set(to.src[e] + ':' + to.dst[e], e);
+      var cells = from.ids.map(function (id) { return ids.has(id) ? ids.get(id) : -1; });
+      var links = Array.from(from.src, function (src, e) {
+        var mapped = edges.get(cells[src] + ':' + cells[from.dst[e]]);
+        return mapped === undefined ? -1 : mapped;
+      });
+      return { cells: cells, edges: links };
+    });
+    return activityMaps[key].then(function (map) {
+      return { scale: destination, frames: (wave.frames || []).map(function (frame) {
+        var cells = [], acts = [];
+        (frame.cells || []).forEach(function (cell, i) {
+          if (map.cells[cell] >= 0) { cells.push(map.cells[cell]); acts.push(frame.acts[i]); }
+        });
+        return { cells: cells, acts: acts, edges: (frame.edges || []).map(function (e) { return map.edges[e]; }).filter(function (e) { return e >= 0; }) };
+      }) };
+    });
+  }
+
+  FlyBrain.mapActivity = mapActivity;
+
   var VERT = [
     'attribute vec3 aBase; attribute float aLevel; attribute float aFlash; attribute float aSize;',
     'uniform float uScale; uniform float uRest; uniform float uLight; uniform float uDpr;',
@@ -446,6 +476,16 @@
     this.dirty = true;
   };
 
+  // Shared by chat and Live Lab: identical frames, cadence and final state.
+  FlyBrain.prototype.playActivity = function (wave) {
+    var self = this, frames = wave.frames || [];
+    this.playWave(frames);
+    var id = setTimeout(function () {
+      if (!self.disposed && wave.state) self.applyState(wave.state.idx, wave.state.val);
+    }, 170 * Math.max(0, frames.length - 1) + 260);
+    this.timers.push(id);
+  };
+
   FlyBrain.prototype.playWave = function (frames, opts) {
     if (!this.target || !frames) return;
     var self = this, gap = (opts && opts.gap) || 170;
@@ -493,7 +533,7 @@
       this.pCol[h * 3 + j] = Math.min(1, c[j] * 0.5 + 0.5);
     }
     this.pT[h] = 0;
-    this.pSpeed[h] = 0.02 + Math.random() * 0.02;
+    this.pSpeed[h] = 0.02 + (e % 101) / 100 * 0.02;
   };
 
   /* An ambient cascade over the real wiring (landing page / lab idle animation). */

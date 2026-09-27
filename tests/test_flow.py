@@ -480,8 +480,8 @@ class ChatFlowTests(unittest.TestCase):
         lab.wait("lab_stats")
         send(self.a, self.room_id, "hello there, lovely weather today!", [self.a, self.b])
         pulse = lab.wait("lab_pulse")
-        self.assertEqual(set(pulse), {"frames"})
-        self.assertEqual(set(pulse["frames"][0]), {"cells", "acts"})
+        self.assertEqual(set(pulse), {"frames", "state", "scale"})
+        self.assertIn("edges", pulse["frames"][0])
         self.assertNotIn("text", json.dumps(pulse))
 
     def test_report_endpoint(self):

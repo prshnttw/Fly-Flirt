@@ -74,3 +74,21 @@ for (const scale of ['standard', 'full']) {
     assert.ok(view.pPos.every(x => x === 9999), 'inactive pulses must not pile up at the origin');
   });
 }
+
+test('cross-pathway activity maps real neuron identities and directed synapses', async () => {
+  for (const [source, destination] of [['standard','full'], ['full','standard']]) {
+    const from = await window.FlyBrain.load(source), to = await window.FlyBrain.load(destination);
+    const wave = {scale:source, frames:[{cells:Array.from({length:from.n},(_,i)=>i), acts:Array(from.n).fill(.7), edges:Array.from({length:from.src.length},(_,i)=>i)}]};
+    const mapped = await window.FlyBrain.mapActivity(wave,destination);
+    const frame = mapped.frames[0];
+    const sourceIds = new Set(from.ids);
+    assert.equal(frame.cells.length, to.ids.filter(id => sourceIds.has(id)).length);
+    assert.equal(frame.cells.length, frame.acts.length);
+    const realEdges = new Set(Array.from(from.src,(s,e)=>from.ids[s]+':'+from.ids[from.dst[e]]));
+    for (const e of frame.edges) {
+      assert.ok(e >= 0 && e < to.src.length);
+      assert.ok(realEdges.has(to.ids[to.src[e]]+':'+to.ids[to.dst[e]]));
+    }
+    assert.ok(frame.edges.length > 0);
+  }
+});

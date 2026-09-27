@@ -319,9 +319,7 @@
   socket.on('fly_update', function (u) { applyUpdate(u); });
   socket.on('brain_wave', function (w) {
     withBrain(function () {
-      brain.playWave(w.frames);
-      var lastGap = 170 * Math.max(0, w.frames.length - 1) + 260;
-      setTimeout(function () { brain.applyState(w.state.idx, w.state.val); }, lastGap);
+      brain.playActivity(w);
     });
   });
   socket.on('analysis_failed', function (m) {
