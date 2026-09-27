@@ -146,3 +146,6 @@ messages once restored from disk. Fully tested both ways (`tests/test_flow.py::R
   left to float on every fresh deploy.
 - Not done for you: a WAF/CDN in front (Cloudflare or similar) if you expect abuse traffic beyond what the
   built-in rate limits handle.
+
+## Credits
+Made by [@prshnttw](https://x.com/prshnttw) and [@Shriyasai1](https://x.com/Shriyasai1).

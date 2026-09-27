@@ -191,6 +191,8 @@ button { font-family: inherit; }
 .site-foot nav { display: flex; justify-content: center; flex-wrap: wrap; gap: 1.1rem; margin-bottom: 0.6rem; }
 .site-foot nav a { color: var(--text-2); }
 .site-foot .disclaimer { max-width: 620px; margin: 0 auto; }
+.site-foot .credits { margin-top: 0.5rem; }
+.site-foot .credits a { color: var(--text-2); }
 
 /* ==========================================================================
    Landing
