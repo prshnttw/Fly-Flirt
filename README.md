@@ -53,8 +53,18 @@ Copy-Item .env.example .env
 .venv\Scripts\python app.py
 ```
 
-Before starting, edit `.env` to set `SECRET_KEY` and optionally `GROQ_API_KEY`
-(`LLM_API_KEY` is also accepted). Without an available LLM, the local heuristic scorer keeps the demo running.
+Before starting, edit `.env`:
+
+- **`SECRET_KEY`** — required. Any random string for local use; the app won't start in production without one.
+- **`GROQ_API_KEY`** (`LLM_API_KEY` also accepted) — optional. Powers real LLM scoring of each message. Get a
+  free key at [console.groq.com](https://console.groq.com). Without one, a local heuristic scorer takes over
+  automatically — the chat, the brain, and the verdict all still fully work, just without a real model behind
+  the scoring.
+- **`NEUPRINT_TOKEN`** — **not needed to run the app.** The MaleCNS connectome data it uses
+  (`static/connectome.json`, `static/connectome_full.json`) already ships pre-built in this repo. A neuPrint
+  token is only needed if you want to *regenerate* that data yourself, via
+  `python tools/build_connectome.py` — get a free one at [neuprint.janelia.org](https://neuprint.janelia.org)
+  if you ever need to.
 
 Open **http://localhost:5000** to start a chat or **http://localhost:5000/lab** for Live Lab.
 To see live firing, keep both views open and send a message in an active two-person chat.
