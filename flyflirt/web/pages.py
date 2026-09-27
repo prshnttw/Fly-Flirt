@@ -116,7 +116,7 @@ def card(token: str):
 
 @pages_bp.get("/lab")
 def lab():
-    return render_template("lab.html", boot={"stats": services().stats()})
+    return render_template("lab.html", boot={"stats": services().stats(), "full_available": services().full_available})
 
 
 @pages_bp.get("/how")

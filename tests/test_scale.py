@@ -69,13 +69,24 @@ class FullPathwayTests(unittest.TestCase):
         self.a.wait("scale_changed", 20)
         self.assertEqual(self.svc.rooms.get(self.room_id).engine.conn.n, cells_before)
 
-    def test_new_messages_use_the_room_scale_and_lab_ignores_full_rooms(self):
+    def test_all_lab_views_receive_full_chat_activity(self):
         self.a.emit("set_scale", {"room_id": self.room_id, "scale": "full"})
         self.a.wait("scale_changed", 20)
         lab = enter_lab(self.app)
-        update = send(self.a, self.room_id, "a warm and curious message!", [self.a, self.b])
-        self.assertEqual(update["counts"]["cells_total"], self.svc.connectome_for("full").n)
-        self.assertFalse(lab.has("lab_pulse"))              # indices belong to a different graph
+        full_lab = enter_lab(self.app)
+        full_lab.emit("lab_subscribe", {"scale": "full"})
+        full_lab.wait("lab_stats")
+        self.a.emit("message", {"room_id": self.room_id, "text": "a warm and curious message!"})
+        wave = self.a.wait("brain_wave")
+        pulse = full_lab.wait("lab_pulse")
+        self.assertEqual(pulse, {k: v for k, v in wave.items() if k != "seq"})
+        self.assertEqual(pulse["scale"], "full")
+        self.assertTrue(any(f["edges"] for f in pulse["frames"]))
+        self.assertEqual(lab.wait("lab_pulse"), pulse)
+        full_lab.emit("lab_subscribe", {"scale": "standard"})
+        full_lab.wait("lab_stats")
+        send(self.a, self.room_id, "another warm message!", [self.a, self.b])
+        self.assertEqual(full_lab.wait("lab_pulse")["scale"], "full")
 
     def test_capacity_limit_and_bad_values(self):
         app = make_app(FULL_MAX_ROOMS=0)
